@@ -30,25 +30,25 @@ func main() {
 	log.SetFlags(log.LstdFlags | log.Lshortfile | log.LUTC | log.Lmicroseconds)
 	log.Printf("%s %s %s %s", projectName, buildVersion, buildTime, runtime.Version())
 	//
-	records := make(chan *record.Record)
+	records := make(chan []*record.Record)
 	go func() {
 		scanner := bufio.NewScanner(os.Stdin)
 		for scanner.Scan() {
-			records <- record.New(nil, scanner.Bytes())
+			records <- []*record.Record{record.New(nil, scanner.Bytes())}
 		}
 	}()
 	b := &builder.Builder{
-		MaxRecords: 2,
 		Compressor: &compression.Zstd{},
-		Input:      records,
+		MinRecords: 1,
+		NumWorkers: 1,
 	}
-	batches := b.Start(1)
+	batches := b.Start(records)
 	p := &producer.Producer{
-		Bootstrap: *bootstrap,
-		Topic:     *topic,
-		Input:     batches,
+		Bootstrap:  *bootstrap,
+		Topic:      *topic,
+		NumWorkers: 1,
 	}
-	exchanges, err := p.Start(1)
+	exchanges, err := p.Start(batches)
 	if err != nil {
 		log.Fatal(err)
 	}

@@ -26,15 +26,16 @@ func createTopic(t *testing.T) string {
 	return topic
 }
 
-func TestIntergationProducerX(t *testing.T) {
-	batches := make(chan *batch.Batch, 10)
+func TestIntergationProducer(t *testing.T) {
 	topic := createTopic(t)
 	p := &Producer{
-		Bootstrap: "localhost:9092",
-		Topic:     topic,
-		Input:     batches,
+		Bootstrap:   "localhost:9092",
+		Topic:       topic,
+		NumWorkers:  10,
+		NumAttempts: 3,
 	}
-	exchanges, err := p.Start(5)
+	batches := make(chan *batch.Batch, 10)
+	exchanges, err := p.Start(batches)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -57,14 +58,15 @@ func TestIntergationProducerX(t *testing.T) {
 }
 
 func TestIntergationProducerBadTopic(t *testing.T) {
-	batches := make(chan *batch.Batch, 10)
 	topic := createTopic(t)
 	p := &Producer{
-		Bootstrap: "localhost:9092",
-		Topic:     topic,
-		Input:     batches,
+		Bootstrap:   "localhost:9092",
+		Topic:       topic,
+		NumWorkers:  10,
+		NumAttempts: 3,
 	}
-	exchanges, err := p.Start(5)
+	batches := make(chan *batch.Batch, 10)
+	exchanges, err := p.Start(batches)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -77,7 +79,7 @@ func TestIntergationProducerBadTopic(t *testing.T) {
 	batches <- b
 	close(batches)
 	for e := range exchanges {
-		if n := len(e.Errors); n != maxRetries {
+		if n := len(e.Errors); n != p.NumAttempts {
 			t.Fatal(n)
 		}
 		t.Logf("%+v", e)

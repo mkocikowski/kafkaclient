@@ -7,22 +7,56 @@ import (
 	"github.com/mkocikowski/libkafka/record"
 )
 
-func TestUnitBuilder(t *testing.T) {
-	records := make(chan *record.Record, 10)
-	records <- record.New(nil, []byte("foo"))
-	records <- record.New(nil, []byte("bar"))
-	close(records)
+func TestUnitBuilderStartStop(t *testing.T) {
 	builder := &Builder{
-		Input:      records,
-		MaxRecords: 1,
 		Compressor: &compression.None{},
+		MinRecords: 1,
+		NumWorkers: 1,
 	}
-	batches := builder.Start(5)
-	n := 0
-	for _ = range batches {
-		n++
+	records := make(chan []*record.Record)
+	batches := builder.Start(records)
+	records <- []*record.Record{record.New(nil, []byte("foo"))}
+	if b := <-batches; b.NumRecords != 1 {
+		t.Fatal(b.NumRecords)
 	}
-	if n != 2 {
-		t.Fatal(n)
+	close(records)
+	if _, ok := <-batches; ok {
+		t.Fatal("expected output to be closed")
+	}
+}
+
+func TestUnitBuilderBigBatch(t *testing.T) {
+	// setting MinRecords=1 but calling Add with 2 records. expect a single
+	// batch of 2 records.
+	builder := &Builder{
+		Compressor: &compression.None{},
+		MinRecords: 1,
+		NumWorkers: 1,
+	}
+	records := make(chan []*record.Record)
+	batches := builder.Start(records)
+	records <- []*record.Record{
+		record.New(nil, []byte("foo")),
+		record.New(nil, []byte("bar")),
+	}
+	if b := <-batches; b.NumRecords != 2 {
+		t.Fatal(b.NumRecords)
+	}
+}
+
+func TestUnitBuilderSmallBatchFlush(t *testing.T) {
+	// setting MinRecords=2 but calling Add with 1 record. then closing the
+	// builder to "flush" expect a batch with only 1 record.
+	builder := &Builder{
+		Compressor: &compression.None{},
+		MinRecords: 2,
+		NumWorkers: 1,
+	}
+	records := make(chan []*record.Record)
+	batches := builder.Start(records)
+	records <- []*record.Record{record.New(nil, []byte("foo"))}
+	close(records)
+	if b := <-batches; b.NumRecords != 1 {
+		t.Fatal(b.NumRecords)
 	}
 }
