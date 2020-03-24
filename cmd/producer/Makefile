@@ -2,7 +2,7 @@ REV?=HEAD
 NAME:=$(shell go list)
 VERSION:=$(shell git rev-list --count $(REV))-$(shell git rev-parse --short $(REV))-$(shell git rev-parse --abbrev-ref HEAD)
 TIME:=$(shell date -u "+%Y-%m-%dT%H:%M:%SZ")
-BIN:=produce
+BIN:=producer
 
 .PHONY: build
 build:

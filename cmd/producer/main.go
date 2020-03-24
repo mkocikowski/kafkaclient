@@ -1,3 +1,7 @@
+// Producer is a synchronous kafka producer. It reads strings from stdin one
+// line at a time and sends them to kafka one record at a time with specified
+// compression. Sending records one at a time is inefficient. This is meant as
+// an example of how to use the library.
 package main
 
 import (
@@ -24,7 +28,7 @@ var (
 
 func main() {
 	rand.Seed(time.Now().UnixNano())
-	bootstrap := flag.String("bootstrap", "localhost:9092", "_lab-kafka._tcp.in.pdx.cfdata.org")
+	bootstrap := flag.String("bootstrap", "localhost:9092", "host:port or SRV")
 	topic := flag.String("topic", fmt.Sprintf("test-%x", rand.Uint32()), "")
 	flag.Parse()
 	log.SetFlags(log.LstdFlags | log.Lshortfile | log.LUTC | log.Lmicroseconds)
@@ -38,15 +42,16 @@ func main() {
 		}
 	}()
 	b := &builder.Builder{
-		Compressor: &compression.Zstd{},
+		Compressor: &compression.None{}, // could be &compression.Zstd{Level: 3} etc
 		MinRecords: 1,
 		NumWorkers: 1,
 	}
 	batches := b.Start(records)
 	p := &producer.Producer{
-		Bootstrap:  *bootstrap,
-		Topic:      *topic,
-		NumWorkers: 1,
+		Bootstrap:   *bootstrap,
+		Topic:       *topic,
+		NumWorkers:  1, // remember to have this >0
+		NumAttempts: 3, // ditto
 	}
 	exchanges, err := p.Start(batches)
 	if err != nil {
