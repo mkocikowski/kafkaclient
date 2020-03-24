@@ -3,7 +3,7 @@ package builder
 import (
 	"testing"
 
-	"code.cfops.it/data/kafkaclient/compression"
+	"github.com/mkocikowski/kafkaclient/compression"
 	"github.com/mkocikowski/libkafka/record"
 )
 

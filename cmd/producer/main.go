@@ -10,9 +10,9 @@ import (
 	"runtime"
 	"time"
 
-	"code.cfops.it/data/kafkaclient/builder"
-	"code.cfops.it/data/kafkaclient/compression"
-	"code.cfops.it/data/kafkaclient/producer"
+	"github.com/mkocikowski/kafkaclient/builder"
+	"github.com/mkocikowski/kafkaclient/compression"
+	"github.com/mkocikowski/kafkaclient/producer"
 	"github.com/mkocikowski/libkafka/record"
 )
 

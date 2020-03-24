@@ -1,4 +1,4 @@
-module code.cfops.it/data/kafkaclient
+module github.com/mkocikowski/kafkaclient
 
 go 1.13
 

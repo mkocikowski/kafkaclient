@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"code.cfops.it/data/kafkaclient/compression"
+	"github.com/mkocikowski/kafkaclient/compression"
 	"github.com/mkocikowski/libkafka/batch"
 	"github.com/mkocikowski/libkafka/client"
 )
