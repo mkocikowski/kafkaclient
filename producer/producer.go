@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/mkocikowski/libkafka/batch"
+	"github.com/mkocikowski/libkafka"
 	"github.com/mkocikowski/libkafka/client"
 	"github.com/mkocikowski/libkafka/client/producer"
 	"github.com/mkocikowski/libkafka/errors"
@@ -18,15 +18,15 @@ import (
 // intend to reuse it (which you could: you could put it back in the producer
 // input).
 type Exchange struct {
-	Batch   *batch.Batch
+	Batch   *libkafka.Batch
 	Success *producer.Response
 	Errors  []error
 }
 
-// Producer sends record batches to Kafka. Make sure to set public field values
-// before calling Start. Do not change them after calling Start. Safe for
-// concurrent use.
-type Producer struct {
+// Async producer sends record batches to Kafka. Make sure to set public field
+// values before calling Start. Do not change them after calling Start. Safe
+// for concurrent use.
+type Async struct {
 	// Kafka bootstrap either host:port or SRV
 	Bootstrap string
 	Topic     string
@@ -48,12 +48,12 @@ type Producer struct {
 	//
 	producers map[int]*producer.PartitionProducer
 	next      chan int
-	in        <-chan *batch.Batch
+	in        <-chan *libkafka.Batch
 	out       chan *Exchange
 	wg        sync.WaitGroup
 }
 
-func (p *Producer) produce(e *Exchange) {
+func (p *Async) produce(e *Exchange) {
 	partition := <-p.next
 	defer func() { p.next <- partition }()
 	partitionProducer := p.producers[partition]
@@ -71,7 +71,7 @@ func (p *Producer) produce(e *Exchange) {
 	e.Success = resp
 }
 
-func (p *Producer) run() {
+func (p *Async) run() {
 	for b := range p.in {
 		e := &Exchange{Batch: b}
 		for i := 0; i < p.NumAttempts; i++ {
@@ -87,7 +87,7 @@ func (p *Producer) run() {
 // Start sending batches to Kafka. When input channel is closed the workers
 // drain it, send any remaining batches to kafka, output the final Exchanges,
 // exit, and close the output channel. You should call Start only once.
-func (p *Producer) Start(input <-chan *batch.Batch) (<-chan *Exchange, error) {
+func (p *Async) Start(input <-chan *libkafka.Batch) (<-chan *Exchange, error) {
 	leaders, err := client.PartitionLeaders(p.Bootstrap, p.Topic)
 	if err != nil {
 		return nil, err

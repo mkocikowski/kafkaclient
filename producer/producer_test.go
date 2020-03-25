@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/mkocikowski/kafkaclient/compression"
+	"github.com/mkocikowski/libkafka"
 	"github.com/mkocikowski/libkafka/batch"
 	"github.com/mkocikowski/libkafka/client"
 )
@@ -28,13 +29,13 @@ func createTopic(t *testing.T) string {
 
 func TestIntergationProducer(t *testing.T) {
 	topic := createTopic(t)
-	p := &Producer{
+	p := &Async{
 		Bootstrap:   "localhost:9092",
 		Topic:       topic,
 		NumWorkers:  10,
 		NumAttempts: 3,
 	}
-	batches := make(chan *batch.Batch, 10)
+	batches := make(chan *libkafka.Batch, 10)
 	exchanges, err := p.Start(batches)
 	if err != nil {
 		t.Fatal(err)
@@ -59,13 +60,13 @@ func TestIntergationProducer(t *testing.T) {
 
 func TestIntergationProducerBadTopic(t *testing.T) {
 	topic := createTopic(t)
-	p := &Producer{
+	p := &Async{
 		Bootstrap:   "localhost:9092",
 		Topic:       topic,
 		NumWorkers:  10,
 		NumAttempts: 3,
 	}
-	batches := make(chan *batch.Batch, 10)
+	batches := make(chan *libkafka.Batch, 10)
 	exchanges, err := p.Start(batches)
 	if err != nil {
 		t.Fatal(err)

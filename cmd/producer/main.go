@@ -14,10 +14,10 @@ import (
 	"runtime"
 	"time"
 
-	"github.com/mkocikowski/kafkaclient/builder"
+	"github.com/mkocikowski/kafkaclient/batches"
 	"github.com/mkocikowski/kafkaclient/compression"
 	"github.com/mkocikowski/kafkaclient/producer"
-	"github.com/mkocikowski/libkafka/record"
+	"github.com/mkocikowski/libkafka"
 )
 
 var (
@@ -34,20 +34,20 @@ func main() {
 	log.SetFlags(log.LstdFlags | log.Lshortfile | log.LUTC | log.Lmicroseconds)
 	log.Printf("%s %s %s %s", projectName, buildVersion, buildTime, runtime.Version())
 	//
-	records := make(chan []*record.Record)
+	records := make(chan []*libkafka.Record)
 	go func() {
 		scanner := bufio.NewScanner(os.Stdin)
 		for scanner.Scan() {
-			records <- []*record.Record{record.New(nil, scanner.Bytes())}
+			records <- []*libkafka.Record{libkafka.NewRecord(nil, scanner.Bytes())}
 		}
 	}()
-	b := &builder.Builder{
+	b := &batches.Builder{
 		Compressor: &compression.None{}, // could be &compression.Zstd{Level: 3} etc
 		MinRecords: 1,
 		NumWorkers: 1,
 	}
 	batches := b.Start(records)
-	p := &producer.Producer{
+	p := &producer.Async{
 		Bootstrap:   *bootstrap,
 		Topic:       *topic,
 		NumWorkers:  1, // remember to have this >0

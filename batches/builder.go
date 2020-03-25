@@ -1,12 +1,12 @@
-// Package builder implements a concurrent record batch builder.
-package builder
+// Package batches implements a concurrent record batch builder.
+package batches
 
 import (
 	"sync"
 	"time"
 
+	"github.com/mkocikowski/libkafka"
 	"github.com/mkocikowski/libkafka/batch"
-	"github.com/mkocikowski/libkafka/record"
 )
 
 // Builder for record batches. Make sure to set public field values before
@@ -22,12 +22,12 @@ type Builder struct {
 	// Must be >0
 	NumWorkers int
 	//
-	in  <-chan []*record.Record
-	out chan *batch.Batch
+	in  <-chan []*libkafka.Record
+	out chan *libkafka.Batch
 	wg  sync.WaitGroup
 }
 
-func (b *Builder) buildSingleBatch() (*batch.Batch, error) {
+func (b *Builder) buildSingleBatch() (*libkafka.Batch, error) {
 	singleBatchBuilder := batch.NewBuilder(time.Now())
 	for r := range b.in {
 		singleBatchBuilder.Add(r...)
@@ -55,9 +55,9 @@ func (b *Builder) run() {
 // channel is closed. It is more efficient to send multiple records at a time
 // on the input channel but the size of the input slices is independent of
 // MinRecords. You should call Start only once.
-func (b *Builder) Start(input <-chan []*record.Record) <-chan *batch.Batch {
+func (b *Builder) Start(input <-chan []*libkafka.Record) <-chan *libkafka.Batch {
 	b.in = input
-	b.out = make(chan *batch.Batch, b.NumWorkers)
+	b.out = make(chan *libkafka.Batch, b.NumWorkers)
 	for i := 0; i < b.NumWorkers; i++ {
 		b.wg.Add(1)
 		go func() {

@@ -1,9 +1,10 @@
-package builder
+package batches
 
 import (
 	"testing"
 
 	"github.com/mkocikowski/kafkaclient/compression"
+	"github.com/mkocikowski/libkafka"
 	"github.com/mkocikowski/libkafka/record"
 )
 
@@ -13,9 +14,9 @@ func TestUnitBuilderStartStop(t *testing.T) {
 		MinRecords: 1,
 		NumWorkers: 1,
 	}
-	records := make(chan []*record.Record)
+	records := make(chan []*libkafka.Record)
 	batches := builder.Start(records)
-	records <- []*record.Record{record.New(nil, []byte("foo"))}
+	records <- []*libkafka.Record{record.New(nil, []byte("foo"))}
 	if b := <-batches; b.NumRecords != 1 {
 		t.Fatal(b.NumRecords)
 	}
@@ -33,9 +34,9 @@ func TestUnitBuilderBigBatch(t *testing.T) {
 		MinRecords: 1,
 		NumWorkers: 1,
 	}
-	records := make(chan []*record.Record)
+	records := make(chan []*libkafka.Record)
 	batches := builder.Start(records)
-	records <- []*record.Record{
+	records <- []*libkafka.Record{
 		record.New(nil, []byte("foo")),
 		record.New(nil, []byte("bar")),
 	}
@@ -52,9 +53,9 @@ func TestUnitBuilderSmallBatchFlush(t *testing.T) {
 		MinRecords: 2,
 		NumWorkers: 1,
 	}
-	records := make(chan []*record.Record)
+	records := make(chan []*libkafka.Record)
 	batches := builder.Start(records)
-	records <- []*record.Record{record.New(nil, []byte("foo"))}
+	records <- []*libkafka.Record{record.New(nil, []byte("foo"))}
 	close(records)
 	if b := <-batches; b.NumRecords != 1 {
 		t.Fatal(b.NumRecords)

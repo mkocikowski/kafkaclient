@@ -7,3 +7,12 @@ Connect a Builder to a Producer and send records to the Builder. See
 cmd/producer for example implementation.
 */
 package kafkaclient
+
+import (
+	"github.com/mkocikowski/kafkaclient/producer"
+	"github.com/mkocikowski/libkafka"
+)
+
+type Producer interface {
+	Start(input <-chan *libkafka.Batch) (<-chan *producer.Exchange, error)
+}
