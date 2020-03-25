@@ -13,7 +13,9 @@ import (
 // calling Start. Do not change them after calling Start. Safe for concurrent
 // use.
 type Builder struct {
-	// Compressor must be safe for concurrent use
+	// Compressor must be safe for concurrent use. You can use one of the
+	// basic compressors implemented in the libkafka/compression package or
+	// provide your own implementation.
 	Compressor batch.Compressor
 	// Each batch will have at least this many records
 	MinRecords int
