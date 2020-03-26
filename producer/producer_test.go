@@ -27,7 +27,7 @@ func createTopic(t *testing.T) string {
 	return topic
 }
 
-func TestIntergationProducer(t *testing.T) {
+func TestIntegrationProducer(t *testing.T) {
 	topic := createTopic(t)
 	p := &Async{
 		Bootstrap:   "localhost:9092",
@@ -58,7 +58,7 @@ func TestIntergationProducer(t *testing.T) {
 	}
 }
 
-func TestIntergationProducerBadTopic(t *testing.T) {
+func TestIntegrationProducerBadTopic(t *testing.T) {
 	topic := createTopic(t)
 	p := &Async{
 		Bootstrap:   "localhost:9092",
