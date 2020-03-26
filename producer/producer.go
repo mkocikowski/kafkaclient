@@ -122,3 +122,9 @@ func (p *Async) Start(input <-chan *libkafka.Batch) (<-chan *Exchange, error) {
 	}()
 	return p.out, nil
 }
+
+// Wait until all outstanding batches have been produced and the producer has
+// cleanly shut down. Calling Wait before Start is a nop.
+func (p *Async) Wait() {
+	p.wg.Wait()
+}

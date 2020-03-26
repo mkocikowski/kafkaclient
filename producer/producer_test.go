@@ -35,6 +35,7 @@ func TestIntegrationProducer(t *testing.T) {
 		NumWorkers:  10,
 		NumAttempts: 3,
 	}
+	p.Wait() // calling Wait before Start should be a nop
 	batches := make(chan *libkafka.Batch, 10)
 	exchanges, err := p.Start(batches)
 	if err != nil {
@@ -56,6 +57,7 @@ func TestIntegrationProducer(t *testing.T) {
 	if n != 2 {
 		t.Fatal(n)
 	}
+	p.Wait()
 }
 
 func TestIntegrationProducerBadTopic(t *testing.T) {
