@@ -15,9 +15,9 @@ import (
 	"time"
 
 	"github.com/mkocikowski/kafkaclient/batches"
-	"github.com/mkocikowski/kafkaclient/compression"
 	"github.com/mkocikowski/kafkaclient/producer"
 	"github.com/mkocikowski/libkafka"
+	"github.com/mkocikowski/libkafka/compression"
 )
 
 var (
@@ -42,7 +42,7 @@ func main() {
 		}
 	}()
 	b := &batches.Builder{
-		Compressor: &compression.None{}, // could be &compression.Zstd{Level: 3} etc
+		Compressor: &compression.Nop{}, // could be &compression.Zstd{Level: 3} etc
 		MinRecords: 1,
 		NumWorkers: 1,
 	}

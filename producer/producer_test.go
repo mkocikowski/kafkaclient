@@ -6,10 +6,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/mkocikowski/kafkaclient/compression"
 	"github.com/mkocikowski/libkafka"
 	"github.com/mkocikowski/libkafka/batch"
 	"github.com/mkocikowski/libkafka/client"
+	"github.com/mkocikowski/libkafka/compression"
 )
 
 func init() {
@@ -42,7 +42,7 @@ func TestIntegrationProducer(t *testing.T) {
 		t.Fatal(err)
 	}
 	now := time.Now()
-	b, _ := batch.NewBuilder(now).AddStrings("foo", "bar").Build(now, &compression.Lz4{})
+	b, _ := batch.NewBuilder(now).AddStrings("foo", "bar").Build(now, &compression.Nop{})
 	batches <- b
 	batches <- b
 	close(batches)
@@ -77,7 +77,7 @@ func TestIntegrationProducerBadTopic(t *testing.T) {
 		p.producers[i].Topic = "nosuchtopic"
 	}
 	now := time.Now()
-	b, _ := batch.NewBuilder(now).AddStrings("foo", "bar").Build(now, &compression.None{})
+	b, _ := batch.NewBuilder(now).AddStrings("foo", "bar").Build(now, &compression.Nop{})
 	batches <- b
 	batches <- b
 	close(batches)

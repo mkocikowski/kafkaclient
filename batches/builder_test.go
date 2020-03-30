@@ -3,14 +3,14 @@ package batches
 import (
 	"testing"
 
-	"github.com/mkocikowski/kafkaclient/compression"
 	"github.com/mkocikowski/libkafka"
+	"github.com/mkocikowski/libkafka/compression"
 	"github.com/mkocikowski/libkafka/record"
 )
 
 func TestUnitBuilderStartStop(t *testing.T) {
 	builder := &Builder{
-		Compressor: &compression.None{},
+		Compressor: &compression.Nop{},
 		MinRecords: 1,
 		NumWorkers: 1,
 	}
@@ -30,7 +30,7 @@ func TestUnitBuilderBigBatch(t *testing.T) {
 	// setting MinRecords=1 but calling Add with 2 records. expect a single
 	// batch of 2 records.
 	builder := &Builder{
-		Compressor: &compression.None{},
+		Compressor: &compression.Nop{},
 		MinRecords: 1,
 		NumWorkers: 1,
 	}
@@ -49,7 +49,7 @@ func TestUnitBuilderSmallBatchFlush(t *testing.T) {
 	// setting MinRecords=2 but calling Add with 1 record. then closing the
 	// builder to "flush" expect a batch with only 1 record.
 	builder := &Builder{
-		Compressor: &compression.None{},
+		Compressor: &compression.Nop{},
 		MinRecords: 2,
 		NumWorkers: 1,
 	}

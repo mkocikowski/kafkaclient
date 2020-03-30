@@ -14,10 +14,8 @@ sending (producing) batches to Kafka. This means that resource use (memory,
 cpu) can be controlled more precisely.
 
 Compression is applied at batch level. Libkafka does not implement compression.
-Codecs are provided by kafkaclient or by the user (codec is provided to batch
-builder instance by the user). This makes it possible to have multiple
-implementations of a compression scheme (for example: DataDog and KlausP for
-zstd).
+Codecs are provided by the user (codec is provided to batch builder instance by
+the user).
 
 The underlying libkafka library implements synchronous single partition
 producer and consumer. This library implements a multi-core batch builder and
