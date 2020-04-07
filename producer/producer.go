@@ -88,7 +88,7 @@ func (p *Async) run() {
 // drain it, send any remaining batches to kafka, output the final Exchanges,
 // exit, and close the output channel. You should call Start only once.
 func (p *Async) Start(input <-chan *libkafka.Batch) (<-chan *Exchange, error) {
-	leaders, err := client.PartitionLeaders(p.Bootstrap, p.Topic)
+	leaders, err := client.GetPartitionLeaders(p.Bootstrap, p.Topic)
 	if err != nil {
 		return nil, err
 	}

@@ -51,7 +51,7 @@ func TestIntegrationProducer(t *testing.T) {
 		if len(e.Errors) != 0 {
 			t.Fatal(e.Errors)
 		}
-		t.Logf("%+v", e)
+		t.Logf("%+v", e.Success)
 		n++
 	}
 	if n != 2 {
