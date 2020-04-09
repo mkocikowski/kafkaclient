@@ -39,7 +39,7 @@ func TestIntegrationJoinAndSync(t *testing.T) {
 		GroupId:   fmt.Sprintf("test-group-%x", rand.Uint32()),
 	}
 	c.init()
-	for i := 0; i < 10; i++ {
+	for i := 0; i < 100; i++ {
 		if err := c.join(); err != nil {
 			t.Log(err)
 			time.Sleep(100 * time.Millisecond)

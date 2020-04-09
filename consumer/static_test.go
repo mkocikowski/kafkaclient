@@ -1,6 +1,7 @@
 package consumer
 
 import (
+	"encoding/base64"
 	"fmt"
 	"math/rand"
 	"testing"
@@ -8,7 +9,6 @@ import (
 
 	"github.com/mkocikowski/libkafka/client"
 	"github.com/mkocikowski/libkafka/client/producer"
-	"github.com/mkocikowski/libkafka/compression"
 )
 
 func init() {
@@ -43,27 +43,32 @@ func TestIntergationStaticConsumer(t *testing.T) {
 	}
 	//
 	c := Static{
-		Bootstrap:  bootstrap,
-		Topic:      topic,
-		NumWorkers: 1,
+		Bootstrap:      bootstrap,
+		Topic:          topic,
+		NumWorkers:     1,
+		HandleResponse: DefaultHandleFetchResponse,
 	}
-	responses, err := c.Start(map[int32]int64{0: 0})
+	exchanges, err := c.Start(map[int32]int64{0: 0})
 	if err != nil {
 		t.Fatal(err)
 	}
-	r := <-responses
-	if r.Error != nil {
+	e := <-exchanges
+	if err := e.RequestError; err != nil {
 		t.Fatal(err)
 	}
-	records, err := r.Records(&compression.Nop{})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if n := len(records); n != 4 {
-		t.Fatal(n)
-	}
+	t.Logf("%+v", e)
+	fmt.Println(base64.StdEncoding.EncodeToString(e.RecordSet))
+	/*
+		records, err := r.Records(&compression.Nop{})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if n := len(records); n != 4 {
+			t.Fatal(n)
+		}
+	*/
 	c.Stop()
-	for _ = range responses { // drain
+	for _ = range exchanges { // drain
 	}
 	c.Wait()
 }

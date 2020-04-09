@@ -2,3 +2,5 @@ github.com/mkocikowski/libkafka v0.0.2 h1:tzHepAg2rRU4ceZHHQNM1AeAIId59NoYBGmDtb
 github.com/mkocikowski/libkafka v0.0.2/go.mod h1:yq/tp+9lNspzf75zi3aFJbXjUlFuduwHgXLKugyMCew=
 github.com/mkocikowski/libkafka v0.0.3-0.20200407155116-d9353caa07bd h1:hP5OfNhzddJdKSkayAwU/wDF3lY9JaPZ3S6RC6PagxQ=
 github.com/mkocikowski/libkafka v0.0.3-0.20200407155116-d9353caa07bd/go.mod h1:yq/tp+9lNspzf75zi3aFJbXjUlFuduwHgXLKugyMCew=
+github.com/mkocikowski/libkafka v0.0.3 h1:EYpLqV5+p1M5YzezDF+ISYEPY+b01jve2MtRJ/0oXM0=
+github.com/mkocikowski/libkafka v0.0.3/go.mod h1:yq/tp+9lNspzf75zi3aFJbXjUlFuduwHgXLKugyMCew=

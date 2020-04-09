@@ -107,10 +107,12 @@ func (c *GroupMembershipManager) run(assignments chan<- []byte) {
 		}
 		if err := c.join(); err != nil {
 			log.Println(err)
+			time.Sleep(100 * time.Millisecond)
 			continue
 		}
 		if err := c.sync(); err != nil {
 			log.Println(err)
+			time.Sleep(100 * time.Millisecond)
 			continue
 		}
 		assignments <- c.assignment
