@@ -9,7 +9,7 @@ import (
 )
 
 func TestUnitBuilderStartStop(t *testing.T) {
-	builder := &Builder{
+	builder := &SequentialBuilder{
 		Compressor: &compression.Nop{},
 		MinRecords: 1,
 		NumWorkers: 1,
@@ -29,7 +29,7 @@ func TestUnitBuilderStartStop(t *testing.T) {
 func TestUnitBuilderBigBatch(t *testing.T) {
 	// setting MinRecords=1 but calling Add with 2 records. expect a single
 	// batch of 2 records.
-	builder := &Builder{
+	builder := &SequentialBuilder{
 		Compressor: &compression.Nop{},
 		MinRecords: 1,
 		NumWorkers: 1,
@@ -48,7 +48,7 @@ func TestUnitBuilderBigBatch(t *testing.T) {
 func TestUnitBuilderSmallBatchFlush(t *testing.T) {
 	// setting MinRecords=2 but calling Add with 1 record. then closing the
 	// builder to "flush" expect a batch with only 1 record.
-	builder := &Builder{
+	builder := &SequentialBuilder{
 		Compressor: &compression.Nop{},
 		MinRecords: 2,
 		NumWorkers: 1,

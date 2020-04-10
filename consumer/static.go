@@ -28,21 +28,19 @@ type ResponseHandlerFunc func(fetcher.Seeker, *Exchange)
 
 func DefaultHandleFetchResponse(s fetcher.Seeker, e *Exchange) {
 	if e.RequestError != nil {
-		log.Printf("nop: handling fetch request error: %w", e.RequestError)
-		// TODO: now what ?
+		// TODO
 		return
 	}
 	if e.ErrorCode == errors.OFFSET_OUT_OF_RANGE {
 		if err := s.Seek(fetcher.MessageNewest); err != nil {
-			log.Printf("error moving offset to newest: %w", err)
-			// TODO: now what ?
+			// TODO
 		}
 		return
 	}
 	offset := e.InitialOffset
 	for _, batch := range e.Batches {
 		if batch.Error != nil {
-			log.Printf("error parsing batch: %w", batch.Error)
+			log.Printf("error parsing batch: %v", batch.Error)
 			continue
 		}
 		offset = batch.LastOffset() + 1

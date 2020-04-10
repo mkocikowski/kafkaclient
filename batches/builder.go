@@ -7,12 +7,13 @@ import (
 
 	"github.com/mkocikowski/libkafka"
 	"github.com/mkocikowski/libkafka/batch"
+	"github.com/mkocikowski/libkafka/record"
 )
 
 // Builder for record batches. Make sure to set public field values before
 // calling Start. Do not change them after calling Start. Safe for concurrent
 // use.
-type Builder struct {
+type SequentialBuilder struct {
 	// Compressor must be safe for concurrent use
 	Compressor batch.Compressor
 	// Each batch will have at least this many records
@@ -20,25 +21,32 @@ type Builder struct {
 	// Must be >0
 	NumWorkers int
 	//
-	in  <-chan []*libkafka.Record
-	out chan *libkafka.Batch
-	wg  sync.WaitGroup
+	in   <-chan []*libkafka.Record
+	sets chan []*libkafka.Record
+	out  chan *libkafka.Batch
+	wg   sync.WaitGroup
 }
 
-func (b *Builder) buildSingleBatch() (*libkafka.Batch, error) {
-	singleBatchBuilder := batch.NewBuilder(time.Now())
+func (b *SequentialBuilder) collectLoop() {
+	var set []*record.Record
 	for r := range b.in {
-		singleBatchBuilder.Add(r...)
-		if singleBatchBuilder.NumRecords() >= b.MinRecords {
-			break
+		set = append(set, r...)
+		if len(set) >= b.MinRecords {
+			b.sets <- set
+			set = nil
 		}
 	}
-	return singleBatchBuilder.Build(time.Now(), b.Compressor)
+	if len(set) > 0 {
+		b.sets <- set
+	}
+	close(b.sets)
 }
 
-func (b *Builder) run() {
-	for {
-		batch, err := b.buildSingleBatch()
+func (b *SequentialBuilder) buildLoop() {
+	for records := range b.sets {
+		builder := batch.NewBuilder(time.Now())
+		builder.Add(records...)
+		batch, err := builder.Build(time.Now(), b.Compressor)
 		if err != nil {
 			return
 		}
@@ -46,20 +54,21 @@ func (b *Builder) run() {
 	}
 }
 
-// Start building batches. Spins up NumWorkers workers which all read records
-// from the same input channel. Returns channel to which workers send completed
+// Start building batches. Returns channel to which workers send completed
 // batches. When input channel is closed the workers drain it, output any
 // remaining batches (even if smaller than MinRecords), exit, and the output
 // channel is closed. It is more efficient to send multiple records at a time
 // on the input channel but the size of the input slices is independent of
 // MinRecords. You should call Start only once.
-func (b *Builder) Start(input <-chan []*libkafka.Record) <-chan *libkafka.Batch {
+func (b *SequentialBuilder) Start(input <-chan []*libkafka.Record) <-chan *libkafka.Batch {
 	b.in = input
+	b.sets = make(chan []*libkafka.Record, b.NumWorkers)
+	go b.collectLoop()
 	b.out = make(chan *libkafka.Batch, b.NumWorkers)
 	for i := 0; i < b.NumWorkers; i++ {
 		b.wg.Add(1)
 		go func() {
-			b.run()
+			b.buildLoop()
 			b.wg.Done()
 		}()
 	}
