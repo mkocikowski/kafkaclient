@@ -4,13 +4,14 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/mkocikowski/libkafka"
 	"github.com/mkocikowski/libkafka/batch"
 	"github.com/mkocikowski/libkafka/client/fetcher"
 	"github.com/mkocikowski/libkafka/record"
 )
 
 type Batch struct {
-	batch.Batch
+	libkafka.Batch
 	Topic     string
 	Partition int32
 	Error     error

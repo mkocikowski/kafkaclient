@@ -2,8 +2,10 @@
 package producer
 
 import (
+	"encoding/json"
 	"fmt"
 	"sync"
+	"time"
 
 	"github.com/mkocikowski/libkafka"
 	"github.com/mkocikowski/libkafka/client"
@@ -11,16 +13,35 @@ import (
 	"github.com/mkocikowski/libkafka/errors"
 )
 
-// Exchange struct records information on multiple errors/responses for a
-// single record batch. Only success response is recorded. Errors are recorded
-// in order. There will be at most Producer.NumAttempts errors. It is safe to
-// alter Batch (for example: set Batch.MarshaledRecords to nil) if you do not
-// intend to reuse it (which you could: you could put it back in the producer
-// input).
+type Batch struct {
+	*libkafka.Batch
+	Topic         string
+	Partition     int32
+	BuildBegin    time.Time
+	BuildComplete time.Time
+	BuildError    error
+	Exchanges     []*Exchange
+}
+
+func (b *Batch) Produced() bool {
+	for _, e := range b.Exchanges {
+		if e.Error == nil && e.Response != nil && e.Response.ErrorCode == errors.NONE {
+			return true
+		}
+	}
+	return false
+}
+
+func (b *Batch) String() string {
+	c, _ := json.Marshal(b)
+	return string(c)
+}
+
 type Exchange struct {
-	Batch   *libkafka.Batch
-	Success *producer.Response
-	Errors  []error
+	Begin    time.Time
+	Complete time.Time
+	Response *producer.Response
+	Error    error
 }
 
 // Async producer sends record batches to Kafka. Make sure to set public field
@@ -48,46 +69,45 @@ type Async struct {
 	//
 	producers map[int]*producer.PartitionProducer
 	next      chan int
-	in        <-chan *libkafka.Batch
-	out       chan *Exchange
+	in        <-chan *Batch
+	out       chan *Batch
 	wg        sync.WaitGroup
 }
 
-func (p *Async) produce(e *Exchange) {
-	partition := <-p.next
+func (p *Async) produce(b *Batch) {
+	partition := <-p.next // TODO: time how long the wait is here
 	defer func() { p.next <- partition }()
+	t := time.Now().UTC()
 	partitionProducer := p.producers[partition]
-	resp, err := partitionProducer.Produce(e.Batch)
-	if err != nil {
-		partitionProducer.Close()
-		e.Errors = append(e.Errors, err)
-		return
-	}
-	if resp.ErrorCode != errors.NONE {
-		partitionProducer.Close()
-		e.Errors = append(e.Errors, &errors.KafkaError{Code: resp.ErrorCode})
-		return
-	}
-	e.Success = resp
+	resp, err := partitionProducer.Produce(b.Batch)
+	b.Exchanges = append(b.Exchanges, &Exchange{
+		Begin:    t,
+		Complete: time.Now().UTC(),
+		Response: resp,
+		Error:    err,
+	})
 }
 
 func (p *Async) run() {
 	for b := range p.in {
-		e := &Exchange{Batch: b}
+		if b.BuildError != nil {
+			p.out <- b // don't even attempt to send
+			continue
+		}
 		for i := 0; i < p.NumAttempts; i++ {
-			p.produce(e)
-			if e.Success != nil {
+			p.produce(b)
+			if b.Produced() {
 				break
 			}
 		}
-		p.out <- e
+		p.out <- b
 	}
 }
 
 // Start sending batches to Kafka. When input channel is closed the workers
 // drain it, send any remaining batches to kafka, output the final Exchanges,
 // exit, and close the output channel. You should call Start only once.
-func (p *Async) Start(input <-chan *libkafka.Batch) (<-chan *Exchange, error) {
+func (p *Async) Start(input <-chan *Batch) (<-chan *Batch, error) {
 	leaders, err := client.GetPartitionLeaders(p.Bootstrap, p.Topic)
 	if err != nil {
 		return nil, err
@@ -108,7 +128,7 @@ func (p *Async) Start(input <-chan *libkafka.Batch) (<-chan *Exchange, error) {
 		p.next <- int(partition)
 	}
 	p.in = input
-	p.out = make(chan *Exchange)
+	p.out = make(chan *Batch)
 	for i := 0; i < p.NumWorkers; i++ {
 		p.wg.Add(1)
 		go func() {

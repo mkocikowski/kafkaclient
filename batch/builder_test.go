@@ -1,4 +1,4 @@
-package batches
+package batch
 
 import (
 	"testing"
@@ -41,7 +41,7 @@ func TestUnitBuilderBigBatch(t *testing.T) {
 		record.New(nil, []byte("bar")),
 	}
 	if b := <-batches; b.NumRecords != 2 {
-		t.Fatal(b.NumRecords)
+		t.Fatal(b, b.NumRecords)
 	}
 }
 
@@ -58,6 +58,6 @@ func TestUnitBuilderSmallBatchFlush(t *testing.T) {
 	records <- []*libkafka.Record{record.New(nil, []byte("foo"))}
 	close(records)
 	if b := <-batches; b.NumRecords != 1 {
-		t.Fatal(b.NumRecords)
+		t.Fatal(b, b.NumRecords)
 	}
 }

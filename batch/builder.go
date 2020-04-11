@@ -1,10 +1,11 @@
-// Package batches implements a concurrent record batch builder.
-package batches
+// Package batch implements a concurrent record batch builder.
+package batch
 
 import (
 	"sync"
 	"time"
 
+	"github.com/mkocikowski/kafkaclient/producer"
 	"github.com/mkocikowski/libkafka"
 	"github.com/mkocikowski/libkafka/batch"
 	"github.com/mkocikowski/libkafka/record"
@@ -22,8 +23,8 @@ type SequentialBuilder struct {
 	NumWorkers int
 	//
 	in   <-chan []*libkafka.Record
+	out  chan *producer.Batch
 	sets chan []*libkafka.Record
-	out  chan *libkafka.Batch
 	wg   sync.WaitGroup
 }
 
@@ -46,11 +47,14 @@ func (b *SequentialBuilder) buildLoop() {
 	for records := range b.sets {
 		builder := batch.NewBuilder(time.Now())
 		builder.Add(records...)
+		t := time.Now().UTC()
 		batch, err := builder.Build(time.Now(), b.Compressor)
-		if err != nil {
-			return
+		b.out <- &producer.Batch{
+			Batch:         batch,
+			BuildError:    err,
+			BuildBegin:    t,
+			BuildComplete: time.Now().UTC(),
 		}
-		b.out <- batch
 	}
 }
 
@@ -60,11 +64,11 @@ func (b *SequentialBuilder) buildLoop() {
 // channel is closed. It is more efficient to send multiple records at a time
 // on the input channel but the size of the input slices is independent of
 // MinRecords. You should call Start only once.
-func (b *SequentialBuilder) Start(input <-chan []*libkafka.Record) <-chan *libkafka.Batch {
+func (b *SequentialBuilder) Start(input <-chan []*libkafka.Record) <-chan *producer.Batch {
 	b.in = input
 	b.sets = make(chan []*libkafka.Record, b.NumWorkers)
 	go b.collectLoop()
-	b.out = make(chan *libkafka.Batch, b.NumWorkers)
+	b.out = make(chan *producer.Batch, b.NumWorkers)
 	for i := 0; i < b.NumWorkers; i++ {
 		b.wg.Add(1)
 		go func() {
