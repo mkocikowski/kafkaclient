@@ -1,7 +1,6 @@
 package consumer
 
 import (
-	"encoding/base64"
 	"fmt"
 	"math/rand"
 	"testing"
@@ -34,6 +33,8 @@ func TestIntergationStaticConsumer(t *testing.T) {
 			Topic:     topic,
 			Partition: 0,
 		},
+		Acks:      1,
+		TimeoutMs: 1000,
 	}
 	if _, err := p.ProduceStrings(time.Now(), "foo", "bar"); err != nil {
 		t.Fatal(err)
@@ -47,6 +48,9 @@ func TestIntergationStaticConsumer(t *testing.T) {
 		Topic:          topic,
 		NumWorkers:     1,
 		HandleResponse: DefaultHandleFetchResponse,
+		MinBytes:       1 << 20,
+		MaxBytes:       1 << 20,
+		MaxWaitTimeMs:  100,
 	}
 	exchanges, err := c.Start(map[int32]int64{0: 0})
 	if err != nil {
@@ -56,17 +60,14 @@ func TestIntergationStaticConsumer(t *testing.T) {
 	if err := e.RequestError; err != nil {
 		t.Fatal(err)
 	}
-	t.Logf("%+v", e)
-	fmt.Println(base64.StdEncoding.EncodeToString(e.RecordSet))
-	/*
-		records, err := r.Records(&compression.Nop{})
-		if err != nil {
-			t.Fatal(err)
-		}
-		if n := len(records); n != 4 {
-			t.Fatal(n)
-		}
-	*/
+	//t.Logf("%+v", e)
+	//fmt.Println(base64.StdEncoding.EncodeToString(e.RecordSet))
+	if n := len(e.Batches); n != 2 {
+		t.Fatal(n)
+	}
+	if n := e.Batches[0].NumRecords; n != 2 {
+		t.Fatal(n)
+	}
 	c.Stop()
 	for _ = range exchanges { // drain
 	}

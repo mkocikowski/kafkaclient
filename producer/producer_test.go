@@ -34,6 +34,8 @@ func TestIntegrationProducerSuccess(t *testing.T) {
 		Topic:       topic,
 		NumWorkers:  10,
 		NumAttempts: 3,
+		Acks:        1,
+		Timeout:     time.Second,
 	}
 	p.Wait() // calling Wait before Start should be a nop
 	in := make(chan *Batch, 10)
@@ -67,6 +69,8 @@ func TestIntegrationProducerBadTopic(t *testing.T) {
 		Topic:       topic,
 		NumWorkers:  10,
 		NumAttempts: 3,
+		Acks:        1,
+		Timeout:     time.Second,
 	}
 	in := make(chan *Batch, 10)
 	out, err := p.Start(in)

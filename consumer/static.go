@@ -15,6 +15,9 @@ type Static struct {
 	Topic          string
 	NumWorkers     int
 	HandleResponse ResponseHandlerFunc
+	MinBytes       int32
+	MaxBytes       int32
+	MaxWaitTimeMs  int32
 	//
 	//fetchers map[int]*fetcher.PartitionFetcher
 	fetchers map[int]fetcher.Fetcher
@@ -84,6 +87,9 @@ func (c *Static) Start(partitionOffsets map[int32]int64) (<-chan *Exchange, erro
 				Topic:     c.Topic,
 				Partition: partition,
 			},
+			MinBytes:      c.MinBytes,
+			MaxBytes:      c.MaxBytes,
+			MaxWaitTimeMs: c.MaxWaitTimeMs,
 		}
 		f.SetOffset(offset)
 		c.fetchers[p] = f

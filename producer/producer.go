@@ -66,6 +66,8 @@ type Async struct {
 	// 1 means 1 initial attempt and no retries. 2 means 1 initial attempt
 	// and 1 more attempt on error. Must be >0.
 	NumAttempts int
+	Acks        int
+	Timeout     time.Duration
 	//
 	producers map[int]*producer.PartitionProducer
 	next      chan int
@@ -124,6 +126,8 @@ func (p *Async) Start(input <-chan *Batch) (<-chan *Batch, error) {
 				Topic:     p.Topic,
 				Partition: partition,
 			},
+			Acks:      int16(p.Acks),
+			TimeoutMs: int32(p.Timeout / time.Millisecond),
 		}
 		p.next <- int(partition)
 	}
