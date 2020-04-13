@@ -15,12 +15,14 @@ import (
 
 type Batch struct {
 	*libkafka.Batch
-	Topic         string
-	Partition     int32
-	BuildBegin    time.Time
-	BuildComplete time.Time
-	BuildError    error
-	Exchanges     []*Exchange
+	Topic            string
+	Partition        int32
+	BuildBegin       time.Time
+	BuildComplete    time.Time
+	BuildError       error
+	CompressComplete time.Time
+	CompressError    error
+	Exchanges        []*Exchange
 }
 
 func (b *Batch) Produced() bool {
@@ -92,7 +94,7 @@ func (p *Async) produce(b *Batch) {
 
 func (p *Async) run() {
 	for b := range p.in {
-		if b.BuildError != nil {
+		if (b.BuildError != nil) || (b.CompressError != nil) {
 			p.out <- b // don't even attempt to send
 			continue
 		}

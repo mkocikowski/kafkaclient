@@ -22,13 +22,13 @@ func (b *Batch) Records(decompressors map[int16]batch.Decompressor) ([]*record.R
 	if d == nil {
 		return nil, fmt.Errorf("no decompressor for type %d", b.Batch.CompressionType())
 	}
-	mm, err := b.Batch.Records(d)
-	if err != nil {
+	if err := b.Batch.Decompress(d); err != nil {
 		return nil, err
 	}
-	records := make([]*record.Record, len(mm))
-	for i, m := range mm {
-		r, err := record.Unmarshal(m)
+	recordsBytes := b.Batch.Records()
+	records := make([]*record.Record, len(recordsBytes))
+	for i, b := range recordsBytes {
+		r, err := record.Unmarshal(b)
 		if err != nil {
 			return nil, err
 		}

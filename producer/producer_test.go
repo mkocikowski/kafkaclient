@@ -44,7 +44,10 @@ func TestIntegrationProducerSuccess(t *testing.T) {
 		t.Fatal(err)
 	}
 	now := time.Now()
-	b, _ := batch.NewBuilder(now).AddStrings("foo", "bar").Build(now, &compression.Nop{})
+	b, _ := batch.NewBuilder(now).AddStrings("foo", "bar").Build(now)
+	if err := b.Compress(&compression.Nop{}); err != nil {
+		t.Fatal(err)
+	}
 	in <- &Batch{Batch: b}
 	in <- &Batch{Batch: b}
 	close(in)
@@ -81,7 +84,7 @@ func TestIntegrationProducerBadTopic(t *testing.T) {
 		p.producers[i].Topic = "nosuchtopic"
 	}
 	now := time.Now()
-	b, _ := batch.NewBuilder(now).AddStrings("foo", "bar").Build(now, &compression.Nop{})
+	b, _ := batch.NewBuilder(now).AddStrings("foo", "bar").Build(now)
 	in <- &Batch{Batch: b}
 	in <- &Batch{Batch: b}
 	close(in)

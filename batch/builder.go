@@ -45,16 +45,21 @@ func (b *SequentialBuilder) collectLoop() {
 
 func (b *SequentialBuilder) buildLoop() {
 	for records := range b.sets {
-		builder := batch.NewBuilder(time.Now())
+		builder := batch.NewBuilder(time.Now().UTC())
 		builder.Add(records...)
 		t := time.Now().UTC()
-		batch, err := builder.Build(time.Now(), b.Compressor)
-		b.out <- &producer.Batch{
+		batch, err := builder.Build(time.Now().UTC())
+		producerBatch := &producer.Batch{
 			Batch:         batch,
 			BuildError:    err,
 			BuildBegin:    t,
 			BuildComplete: time.Now().UTC(),
 		}
+		if err == nil {
+			producerBatch.CompressError = batch.Compress(b.Compressor)
+			producerBatch.CompressComplete = time.Now().UTC()
+		}
+		b.out <- producerBatch
 	}
 }
 
