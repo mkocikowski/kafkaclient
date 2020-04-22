@@ -1,7 +1,8 @@
 version: "3.6"
 services:
   kafka:
-    build: .
+    #build: .
+    image: mkocikowski/kafka:2.3.0
     ports: 
       - 9092:9092
     volumes:
@@ -10,7 +11,8 @@ services:
     depends_on: 
       - zookeeper # need un-register the broker before shutting down zk to be able to start back up
   zookeeper:
-    build: .
+    #build: .
+    image: mkocikowski/kafka:2.3.0
     volumes:
       - ./zookeeper.properties:/opt/kafka/config/zookeeper.properties
     command: ./bin/zookeeper-server-start.sh ./config/zookeeper.properties
