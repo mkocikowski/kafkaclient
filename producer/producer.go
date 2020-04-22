@@ -13,11 +13,10 @@ import (
 	"github.com/mkocikowski/libkafka/errors"
 )
 
-// Batch is the unit on which the producer operates. In addition to fields
-// inherited from libkafka.Batch (related to the wire protocol), the producer
-// Batch records the entire "life cycle" of a batch: from recording timings on
-// batch production, errors, through multiple (possibly) Produce api calls.
-// Batches are created by builders (in the batch package) and are passed along
+// Batch is the unit on which the producer operates. In addition to fields inherited from
+// libkafka.Batch (related to the wire protocol), the producer Batch records the entire "life cycle"
+// of a batch: from recording timings on batch production, errors, through multiple (possibly)
+// Produce api calls.  Batches are created by builders (in the batch package) and are passed along
 // to methods the mutate them recording additional information.
 type Batch struct {
 	*libkafka.Batch
@@ -32,8 +31,8 @@ type Batch struct {
 	Exchanges         []*Exchange // each exchange records a Produce api call and response
 }
 
-// Produced returns true if the batch has been successfuly produced (built,
-// sent, and acked by a broker).
+// Produced returns true if the batch has been successfuly produced (built, sent, and acked by a
+// broker).
 func (b *Batch) Produced() bool {
 	for _, e := range b.Exchanges {
 		if e.Error == nil && e.Response != nil && e.Response.ErrorCode == errors.NONE {
@@ -48,8 +47,8 @@ func (b *Batch) String() string {
 	return string(c)
 }
 
-// Exchange records information about a single Produce api call and response. A
-// batch will have one or more exchanges attached to it.
+// Exchange records information about a single Produce api call and response. A batch will have one
+// or more exchanges attached to it.
 type Exchange struct {
 	Begin    time.Time
 	Complete time.Time
@@ -57,27 +56,23 @@ type Exchange struct {
 	Error    error
 }
 
-// Async producer sends record batches to Kafka. Make sure to set public field
-// values before calling Start. Do not change them after calling Start. Safe
-// for concurrent use.
+// Async producer sends record batches to Kafka. Make sure to set public field values before calling
+// Start. Do not change them after calling Start. Safe for concurrent use.
 type Async struct {
 	// Kafka bootstrap either host:port or SRV
 	Bootstrap string
 	Topic     string
-	// Spin up this many workers. Each worker is synchronous. Each worker
-	// processes one batch at a time trying to send it to a random
-	// partition. On error the worker retries up to NumRetries each time
-	// trying to send the batch to a different partition. Details are
-	// returned in Exchange structs. After each error the underlying
-	// connection to the kafka topic partition leader is closed, and
-	// reopened on the next call to that leader. Because workers are
-	// synchronous NumWorkers determines the maximum number of "in flight"
-	// batches. It makes no sense to have more workers than partitions.
-	// Setting NumWorkers=1 results in Producer being synchronous. Must be
-	// >0.
+	// Spin up this many workers. Each worker is synchronous. Each worker processes one batch at
+	// a time trying to send it to a random partition. On error the worker retries up to
+	// NumRetries each time trying to send the batch to a different partition. Details are
+	// returned in Exchange structs. After each error the underlying connection to the kafka
+	// topic partition leader is closed, and reopened on the next call to that leader. Because
+	// workers are synchronous NumWorkers determines the maximum number of "in flight" batches.
+	// It makes no sense to have more workers than partitions.  Setting NumWorkers=1 results in
+	// Producer being synchronous. Must be >0.
 	NumWorkers int
-	// 1 means 1 initial attempt and no retries. 2 means 1 initial attempt
-	// and 1 more attempt on error. Must be >0.
+	// 1 means 1 initial attempt and no retries. 2 means 1 initial attempt and 1 more attempt on
+	// error. Must be >0.
 	NumAttempts int
 	Acks        int
 	Timeout     time.Duration
@@ -119,9 +114,9 @@ func (p *Async) run() {
 	}
 }
 
-// Start sending batches to Kafka. When input channel is closed the workers
-// drain it, send any remaining batches to kafka, output the final Exchanges,
-// exit, and close the output channel. You should call Start only once.
+// Start sending batches to Kafka. When input channel is closed the workers drain it, send any
+// remaining batches to kafka, output the final Exchanges, exit, and close the output channel. You
+// should call Start only once.
 func (p *Async) Start(input <-chan *Batch) (<-chan *Batch, error) {
 	leaders, err := client.GetPartitionLeaders(p.Bootstrap, p.Topic)
 	if err != nil {
@@ -160,8 +155,8 @@ func (p *Async) Start(input <-chan *Batch) (<-chan *Batch, error) {
 	return p.out, nil
 }
 
-// Wait until all outstanding batches have been produced and the producer has
-// cleanly shut down. Calling Wait before Start is a nop.
+// Wait until all outstanding batches have been produced and the producer has cleanly shut down.
+// Calling Wait before Start is a nop.
 func (p *Async) Wait() {
 	p.wg.Wait()
 }
