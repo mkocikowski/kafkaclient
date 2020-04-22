@@ -13,6 +13,12 @@ import (
 	"github.com/mkocikowski/libkafka/errors"
 )
 
+// Batch is the unit on which the producer operates. In addition to fields
+// inherited from libkafka.Batch (related to the wire protocol), the producer
+// Batch records the entire "life cycle" of a batch: from recording timings on
+// batch production, errors, through multiple (possibly) Produce api calls.
+// Batches are created by builders (in the batch package) and are passed along
+// to methods the mutate them recording additional information.
 type Batch struct {
 	*libkafka.Batch
 	Topic            string
@@ -22,9 +28,11 @@ type Batch struct {
 	BuildError       error
 	CompressComplete time.Time
 	CompressError    error
-	Exchanges        []*Exchange
+	Exchanges        []*Exchange // each exchange records a Produce api call and response
 }
 
+// Produced returns true if the batch has been successfuly produced (built,
+// sent, and acked by a broker).
 func (b *Batch) Produced() bool {
 	for _, e := range b.Exchanges {
 		if e.Error == nil && e.Response != nil && e.Response.ErrorCode == errors.NONE {
@@ -39,6 +47,8 @@ func (b *Batch) String() string {
 	return string(c)
 }
 
+// Exchange records information about a single Produce api call and response. A
+// batch will have one or more exchanges attached to it.
 type Exchange struct {
 	Begin    time.Time
 	Complete time.Time

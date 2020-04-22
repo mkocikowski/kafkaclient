@@ -19,7 +19,14 @@ type SequentialBuilder struct {
 	Compressor batch.Compressor
 	// Each batch will have at least this many records
 	MinRecords int
-	// Must be >0
+	// Incoming records are collected into sets, the size of which (the number of records in
+	// each set) is determined by MinRecords. Each of these sets of records must be built into
+	// a batch: records needs to be serialized into wire format and then compressed. Each set of
+	// records is precessed by a worker and results in a single producer.Batch. NumWorkers
+	// determines the number of workers doing the serialization and compression. This is most
+	// likely the most expensive part of the whole pipeline (especially when compression is
+	// enabled) so set this accordingly (but doesn't make sense for it to be more than the
+	// number of available cores). Must be >0
 	NumWorkers int
 	//
 	in   <-chan []*libkafka.Record
