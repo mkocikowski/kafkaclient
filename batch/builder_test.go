@@ -17,8 +17,12 @@ func TestUnitBuilderStartStop(t *testing.T) {
 	records := make(chan []*libkafka.Record)
 	batches := builder.Start(records)
 	records <- []*libkafka.Record{record.New(nil, []byte("foo"))}
-	if b := <-batches; b.NumRecords != 1 {
+	b := <-batches
+	if b.NumRecords != 1 {
 		t.Fatal(b.NumRecords)
+	}
+	if b.UncompressedBytes != b.BatchLengthBytes {
+		t.Fatal(b.UncompressedBytes, b.BatchLengthBytes)
 	}
 	close(records)
 	if _, ok := <-batches; ok {
@@ -26,9 +30,8 @@ func TestUnitBuilderStartStop(t *testing.T) {
 	}
 }
 
+// setting MinRecords=1 but calling Add with 2 records. expect a single batch of 2 records
 func TestUnitBuilderBigBatch(t *testing.T) {
-	// setting MinRecords=1 but calling Add with 2 records. expect a single
-	// batch of 2 records.
 	builder := &SequentialBuilder{
 		Compressor: &compression.Nop{},
 		MinRecords: 1,
@@ -45,9 +48,9 @@ func TestUnitBuilderBigBatch(t *testing.T) {
 	}
 }
 
+// setting MinRecords=2 but calling Add with 1 record. then closing the builder to "flush" expect a
+// batch with only 1 record
 func TestUnitBuilderSmallBatchFlush(t *testing.T) {
-	// setting MinRecords=2 but calling Add with 1 record. then closing the
-	// builder to "flush" expect a batch with only 1 record.
 	builder := &SequentialBuilder{
 		Compressor: &compression.Nop{},
 		MinRecords: 2,

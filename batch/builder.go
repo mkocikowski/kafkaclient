@@ -11,9 +11,11 @@ import (
 	"github.com/mkocikowski/libkafka/record"
 )
 
-// Builder for record batches. Make sure to set public field values before
-// calling Start. Do not change them after calling Start. Safe for concurrent
-// use.
+// Builder for record batches. Make sure to set public field values before calling Start. Do not
+// change them after calling Start. Safe for concurrent use. The builder is called "sequential"
+// because even tough it runs multiple workers, workload is distributed sequentially: first batch to
+// worker 1, second to worker 2, etc (as opposed: all workers take records from input at the same
+// time and then all flush at the same time with a thundering herd).
 type SequentialBuilder struct {
 	// Compressor must be safe for concurrent use
 	Compressor batch.Compressor
@@ -21,7 +23,7 @@ type SequentialBuilder struct {
 	MinRecords int
 	// Incoming records are collected into sets, the size of which (the number of records in
 	// each set) is determined by MinRecords. Each of these sets of records must be built into
-	// a batch: records needs to be serialized into wire format and then compressed. Each set of
+	// a batch: records need to be serialized into wire format and then compressed. Each set of
 	// records is precessed by a worker and results in a single producer.Batch. NumWorkers
 	// determines the number of workers doing the serialization and compression. This is most
 	// likely the most expensive part of the whole pipeline (especially when compression is
@@ -63,6 +65,7 @@ func (b *SequentialBuilder) buildLoop() {
 			BuildComplete: time.Now().UTC(),
 		}
 		if err == nil {
+			producerBatch.UncompressedBytes = producerBatch.BatchLengthBytes
 			producerBatch.CompressError = batch.Compress(b.Compressor)
 			producerBatch.CompressComplete = time.Now().UTC()
 		}
@@ -70,11 +73,10 @@ func (b *SequentialBuilder) buildLoop() {
 	}
 }
 
-// Start building batches. Returns channel to which workers send completed
-// batches. When input channel is closed the workers drain it, output any
-// remaining batches (even if smaller than MinRecords), exit, and the output
-// channel is closed. It is more efficient to send multiple records at a time
-// on the input channel but the size of the input slices is independent of
+// Start building batches. Returns channel to which workers send completed batches. When input
+// channel is closed the workers drain it, output any remaining batches (even if smaller than
+// MinRecords), exit, and the output channel is closed. It is more efficient to send multiple
+// records at a time on the input channel but the size of the input slices is independent of
 // MinRecords. You should call Start only once.
 func (b *SequentialBuilder) Start(input <-chan []*libkafka.Record) <-chan *producer.Batch {
 	b.in = input

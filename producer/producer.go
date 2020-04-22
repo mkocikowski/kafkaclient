@@ -21,14 +21,15 @@ import (
 // to methods the mutate them recording additional information.
 type Batch struct {
 	*libkafka.Batch
-	Topic            string
-	Partition        int32
-	BuildBegin       time.Time
-	BuildComplete    time.Time
-	BuildError       error
-	CompressComplete time.Time
-	CompressError    error
-	Exchanges        []*Exchange // each exchange records a Produce api call and response
+	Topic             string
+	Partition         int32
+	BuildBegin        time.Time
+	BuildComplete     time.Time
+	BuildError        error
+	CompressComplete  time.Time
+	CompressError     error
+	UncompressedBytes int32       // batch size can't be more than MaxInt32
+	Exchanges         []*Exchange // each exchange records a Produce api call and response
 }
 
 // Produced returns true if the batch has been successfuly produced (built,
