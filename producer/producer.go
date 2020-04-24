@@ -35,7 +35,7 @@ type Batch struct {
 // broker).
 func (b *Batch) Produced() bool {
 	for _, e := range b.Exchanges {
-		if e.Error == nil && e.Response != nil && e.Response.ErrorCode == errors.NONE {
+		if e.Err() == nil {
 			return true
 		}
 	}
@@ -53,7 +53,27 @@ type Exchange struct {
 	Begin    time.Time
 	Complete time.Time
 	Response *producer.Response
-	Error    error
+	// This is populated if there was an error getting response from the broker. So things like
+	// network timeouts, broker down, bad protocol version, etc. This being nil means that
+	// response was successfuly read and parsed. But, response itself may contain an error code.
+	Error error
+}
+
+var ErrNilResponse = fmt.Errorf("nil response from broker")
+
+// Err returns an error if: Exchange.Error is not nil; Exchange.Error is nil but Exchange.Response
+// is nil; Exchange.Error is nil and Exchange.Response.ErrorCode is not NONE.
+func (e *Exchange) Err() error {
+	if e.Error != nil {
+		return e.Error
+	}
+	if e.Response == nil {
+		return ErrNilResponse
+	}
+	if e.Response.ErrorCode != errors.NONE {
+		return &errors.KafkaError{Code: e.Response.ErrorCode}
+	}
+	return nil
 }
 
 // Async producer sends record batches to Kafka. Make sure to set public field values before calling
@@ -90,12 +110,20 @@ func (p *Async) produce(b *Batch) {
 	t := time.Now().UTC()
 	partitionProducer := p.producers[partition]
 	resp, err := partitionProducer.Produce(b.Batch)
-	b.Exchanges = append(b.Exchanges, &Exchange{
+	exchange := &Exchange{
 		Begin:    t,
 		Complete: time.Now().UTC(),
 		Response: resp,
 		Error:    err,
-	})
+	}
+	if exchange.Err() != nil {
+		// not getting into the specifics of what the problem is. close the connection, it
+		// will be reopened on the next produce attempt. the expense is not prohibitive if
+		// this is a one-off (say NOT_LEADER_FOR_PARTITION) but if the problem is severe we
+		// are hosed anyway
+		partitionProducer.Close()
+	}
+	b.Exchanges = append(b.Exchanges, exchange)
 }
 
 func (p *Async) run() {

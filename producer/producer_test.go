@@ -1,6 +1,7 @@
 package producer
 
 import (
+	"errors"
 	"fmt"
 	"math/rand"
 	"testing"
@@ -8,6 +9,7 @@ import (
 
 	"github.com/mkocikowski/libkafka/batch"
 	"github.com/mkocikowski/libkafka/client"
+	"github.com/mkocikowski/libkafka/client/producer"
 	"github.com/mkocikowski/libkafka/compression"
 )
 
@@ -93,5 +95,27 @@ func TestIntegrationProducerBadTopic(t *testing.T) {
 			t.Fatal(n)
 		}
 		t.Logf("%+v", b)
+	}
+}
+
+func TestUnitBatchProduced(t *testing.T) {
+	tests := []struct {
+		e    []*Exchange
+		want bool
+	}{
+		{e: nil, want: false},
+		{e: []*Exchange{&Exchange{}}, want: false},
+		{e: []*Exchange{&Exchange{Error: errors.New("err")}}, want: false},
+		{e: []*Exchange{&Exchange{Response: &producer.Response{}}}, want: true},
+		{e: []*Exchange{&Exchange{Response: &producer.Response{ErrorCode: 1}}}, want: false},
+		{e: []*Exchange{
+			&Exchange{Response: &producer.Response{ErrorCode: 1}},
+			&Exchange{Response: &producer.Response{}}}, want: true},
+	}
+	for _, test := range tests {
+		b := &Batch{Exchanges: test.e}
+		if got := b.Produced(); got != test.want {
+			t.Fatal(got, test.want)
+		}
 	}
 }
