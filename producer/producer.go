@@ -142,9 +142,10 @@ func (p *Async) run() {
 	}
 }
 
-// Start sending batches to Kafka. When input channel is closed the workers drain it, send any
-// remaining batches to kafka, output the final Exchanges, exit, and close the output channel. You
-// should call Start only once.
+// Start sending batches to Kafka. Returns a channel on which all produced (success or no) batches
+// are sent. You need to read from that channel or production will be blocked. When input channel is
+// closed the workers drain it, send any remaining batches to kafka, output the final batches,
+// exit, and close the output channel. You should call Start only once.
 func (p *Async) Start(input <-chan *Batch) (<-chan *Batch, error) {
 	leaders, err := client.GetPartitionLeaders(p.Bootstrap, p.Topic)
 	if err != nil {
