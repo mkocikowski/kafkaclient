@@ -27,22 +27,27 @@ type Static struct {
 	wg       sync.WaitGroup
 }
 
-type ResponseHandlerFunc func(fetcher.Seeker, *Exchange)
+type ResponseHandlerFunc func(fetcher.SeekCloser, *Exchange)
 
-func DefaultHandleFetchResponse(s fetcher.Seeker, e *Exchange) {
+func DefaultHandleFetchResponse(s fetcher.SeekCloser, e *Exchange) {
 	if e.RequestError != nil {
-		// TODO
+		// connection has been closed in libkafka
 		return
 	}
 	if e.ErrorCode == errors.OFFSET_OUT_OF_RANGE {
 		if err := s.Seek(fetcher.MessageNewest); err != nil {
-			// TODO
+			s.Close()
 		}
+		return
+	}
+	if e.ErrorCode != errors.NONE {
+		s.Close()
 		return
 	}
 	offset := e.InitialOffset
 	for _, batch := range e.Batches {
 		if batch.Error != nil {
+			// TODO: DO NOT log from library
 			log.Printf("error parsing batch: %v", batch.Error)
 			continue
 		}

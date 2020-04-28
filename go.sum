@@ -8,3 +8,5 @@ github.com/mkocikowski/libkafka v0.0.4 h1:lKHiM6wj4/QRad5rGz5yWVURfwzzpNQUzqn354
 github.com/mkocikowski/libkafka v0.0.4/go.mod h1:yq/tp+9lNspzf75zi3aFJbXjUlFuduwHgXLKugyMCew=
 github.com/mkocikowski/libkafka v0.0.5 h1:q6tj73iPaB/lmf5A4bYR6KWvfSdy30sctz77hIMdCNs=
 github.com/mkocikowski/libkafka v0.0.5/go.mod h1:yq/tp+9lNspzf75zi3aFJbXjUlFuduwHgXLKugyMCew=
+github.com/mkocikowski/libkafka v0.0.6 h1:6SSdozX2F4To+0ZJx1SSfEoe0FY1gI6TJerPt1W8rw4=
+github.com/mkocikowski/libkafka v0.0.6/go.mod h1:yq/tp+9lNspzf75zi3aFJbXjUlFuduwHgXLKugyMCew=
