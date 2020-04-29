@@ -65,6 +65,10 @@ func (c *Static) consume() *Exchange {
 	defer func() { c.next <- partition }()
 	f := c.fetchers[partition]
 	e := &Exchange{InitialOffset: f.Offset()}
+	// topic and partition are not populated when there is a wire error so setting them here so
+	// that errors can be analyzed better
+	e.Topic = c.Topic
+	e.Partition = int32(partition)
 	e.parseFetchResponse(f.Fetch())
 	c.HandleResponse(f, e)
 	return e
