@@ -10,3 +10,7 @@ github.com/mkocikowski/libkafka v0.0.5 h1:q6tj73iPaB/lmf5A4bYR6KWvfSdy30sctz77hI
 github.com/mkocikowski/libkafka v0.0.5/go.mod h1:yq/tp+9lNspzf75zi3aFJbXjUlFuduwHgXLKugyMCew=
 github.com/mkocikowski/libkafka v0.0.6 h1:6SSdozX2F4To+0ZJx1SSfEoe0FY1gI6TJerPt1W8rw4=
 github.com/mkocikowski/libkafka v0.0.6/go.mod h1:yq/tp+9lNspzf75zi3aFJbXjUlFuduwHgXLKugyMCew=
+github.com/mkocikowski/libkafka v0.0.7-0.20200429184154-fdc281285150 h1:9bmLow/19aFXqLpOPp0TJkyPdQrpb7QltRS0BuAKZqk=
+github.com/mkocikowski/libkafka v0.0.7-0.20200429184154-fdc281285150/go.mod h1:yq/tp+9lNspzf75zi3aFJbXjUlFuduwHgXLKugyMCew=
+github.com/mkocikowski/libkafka v0.0.7-0.20200429205121-3c1e410650ee h1:DYEaLrzSPmyS3vj3frRKmk1U8tB4MqS0LinBqldX4As=
+github.com/mkocikowski/libkafka v0.0.7-0.20200429205121-3c1e410650ee/go.mod h1:yq/tp+9lNspzf75zi3aFJbXjUlFuduwHgXLKugyMCew=

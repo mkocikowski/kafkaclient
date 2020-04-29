@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/mkocikowski/libkafka"
+	"github.com/mkocikowski/libkafka/batch"
 	"github.com/mkocikowski/libkafka/compression"
 	"github.com/mkocikowski/libkafka/record"
 )
@@ -62,5 +63,37 @@ func TestUnitBuilderSmallBatchFlush(t *testing.T) {
 	close(records)
 	if b := <-batches; b.NumRecords != 1 {
 		t.Fatal(b, b.NumRecords)
+	}
+}
+
+func TestUnitBuilderEmptySets(t *testing.T) {
+	builder := &SequentialBuilder{
+		Compressor: &compression.Nop{},
+		MinRecords: 1,
+		NumWorkers: 1,
+	}
+	records := make(chan []*libkafka.Record)
+	batches := builder.Start(records)
+	records <- []*libkafka.Record{}
+	records <- []*libkafka.Record{}
+	close(records)
+	if b := <-batches; b != nil {
+		t.Fatalf("%+v", b)
+	}
+}
+
+func TestUnitBuilderNilRecords(t *testing.T) {
+	builder := &SequentialBuilder{
+		Compressor: &compression.Nop{},
+		MinRecords: 1,
+		NumWorkers: 1,
+	}
+	records := make(chan []*libkafka.Record)
+	batches := builder.Start(records)
+	records <- []*libkafka.Record{}
+	records <- []*libkafka.Record{nil, nil}
+	close(records)
+	if b := <-batches; b.BuildError != batch.ErrNilRecord {
+		t.Fatal(b.BuildError)
 	}
 }

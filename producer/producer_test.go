@@ -119,3 +119,11 @@ func TestUnitBatchProduced(t *testing.T) {
 		}
 	}
 }
+
+func TestUnitEmptyBatch(t *testing.T) {
+	defer func() { recover() }()
+	b := &Batch{}
+	t.Log(b.NumRecords)
+	t.Fatal("expected panic")
+
+}

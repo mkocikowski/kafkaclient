@@ -19,7 +19,8 @@ import (
 type SequentialBuilder struct {
 	// Compressor must be safe for concurrent use
 	Compressor batch.Compressor
-	// Each batch will have at least this many records
+	// Each batch will have at least this many records. There is no "max": user can send slices
+	// or any size on the input channel. It is up to the user to enforce sanity of input slices.
 	MinRecords int
 	// Incoming records are collected into sets, the size of which (the number of records in
 	// each set) is determined by MinRecords. Each of these sets of records must be built into
@@ -73,11 +74,13 @@ func (b *SequentialBuilder) buildLoop() {
 	}
 }
 
-// Start building batches. Returns channel to which workers send completed batches. When input
+// Start building batches. Returns channel on which workers return completed batches. When input
 // channel is closed the workers drain it, output any remaining batches (even if smaller than
 // MinRecords), exit, and the output channel is closed. It is more efficient to send multiple
 // records at a time on the input channel but the size of the input slices is independent of
-// MinRecords. You should call Start only once.
+// MinRecords (and so open to abuse: you could send a huge input slice; up to you to ensure slice
+// sanity). Empty slices passed on input are ignored. If any record is nil, this will result in
+// batch.ErrNilSlice when the batch is built. You should call Start only once.
 func (b *SequentialBuilder) Start(input <-chan []*libkafka.Record) <-chan *producer.Batch {
 	b.in = input
 	b.sets = make(chan []*libkafka.Record, b.NumWorkers)
