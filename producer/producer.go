@@ -19,7 +19,7 @@ import (
 // Produce api calls.  Batches are created by builders (in the batch package) and are passed along
 // to methods the mutate them recording additional information.
 type Batch struct {
-	*libkafka.Batch
+	libkafka.Batch
 	Topic             string
 	Partition         int32
 	BuildBegin        time.Time
@@ -109,7 +109,7 @@ func (p *Async) produce(b *Batch) {
 	defer func() { p.next <- partition }()
 	t := time.Now().UTC()
 	partitionProducer := p.producers[partition]
-	resp, err := partitionProducer.Produce(b.Batch)
+	resp, err := partitionProducer.Produce(&b.Batch)
 	exchange := &Exchange{
 		Begin:    t,
 		Complete: time.Now().UTC(),

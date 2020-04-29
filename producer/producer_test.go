@@ -50,8 +50,8 @@ func TestIntegrationProducerSuccess(t *testing.T) {
 	if err := b.Compress(&compression.Nop{}); err != nil {
 		t.Fatal(err)
 	}
-	in <- &Batch{Batch: b}
-	in <- &Batch{Batch: b}
+	in <- &Batch{Batch: *b}
+	in <- &Batch{Batch: *b}
 	close(in)
 	n := 0
 	for b := range out {
@@ -87,8 +87,8 @@ func TestIntegrationProducerBadTopic(t *testing.T) {
 	}
 	now := time.Now()
 	b, _ := batch.NewBuilder(now).AddStrings("foo", "bar").Build(now)
-	in <- &Batch{Batch: b}
-	in <- &Batch{Batch: b}
+	in <- &Batch{Batch: *b}
+	in <- &Batch{Batch: *b}
 	close(in)
 	for b := range out {
 		if n := len(b.Exchanges); n != p.NumAttempts {
@@ -121,9 +121,8 @@ func TestUnitBatchProduced(t *testing.T) {
 }
 
 func TestUnitEmptyBatch(t *testing.T) {
-	defer func() { recover() }()
 	b := &Batch{}
-	t.Log(b.NumRecords)
-	t.Fatal("expected panic")
-
+	if n := b.NumRecords; n != 0 {
+		t.Fatal(n)
+	}
 }
