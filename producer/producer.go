@@ -17,7 +17,7 @@ import (
 // libkafka.Batch (related to the wire protocol), the producer Batch records the entire "life cycle"
 // of a batch: from recording timings on batch production, errors, through multiple (possibly)
 // Produce api calls.  Batches are created by builders (in the batch package) and are passed along
-// to methods the mutate them recording additional information.
+// to methods that mutate them recording additional information.
 type Batch struct {
 	libkafka.Batch
 	Topic             string
@@ -94,8 +94,16 @@ type Async struct {
 	// 1 means 1 initial attempt and no retries. 2 means 1 initial attempt and 1 more attempt on
 	// error. Must be >0.
 	NumAttempts int
-	Acks        int
-	Timeout     time.Duration
+	// Sleep this long between repeated produce calls for the same batch.  This is a mixed
+	// thing: if errors to produce are because partition leadership has moved, then it would
+	// make sense to make next call immediately (because the leader would be found etc). But if
+	// there is a problem with leadership / some other kind of slow down, then waiting for a bit
+	// is good: keeps the producer from "needlessly" dropping the batch. This logic will become
+	// even more complicated if data is partitioned (right now delivery is to random partition).
+	// Anyway. Feel free to set to 0.
+	SleepBetweenAttempts time.Duration
+	Acks                 int
+	Timeout              time.Duration
 	//
 	producers map[int]*producer.PartitionProducer
 	next      chan int
@@ -137,6 +145,7 @@ func (p *Async) run() {
 			if b.Produced() {
 				break
 			}
+			time.Sleep(p.SleepBetweenAttempts)
 		}
 		p.out <- b
 	}
