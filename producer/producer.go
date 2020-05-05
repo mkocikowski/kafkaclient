@@ -7,10 +7,10 @@ import (
 	"sync"
 	"time"
 
+	"github.com/mkocikowski/kafkaclient"
 	"github.com/mkocikowski/libkafka"
 	"github.com/mkocikowski/libkafka/client"
 	"github.com/mkocikowski/libkafka/client/producer"
-	"github.com/mkocikowski/libkafka/errors"
 )
 
 // Batch is the unit on which the producer operates. In addition to fields inherited from
@@ -34,12 +34,7 @@ type Batch struct {
 // Produced returns true if the batch has been successfuly produced (built, sent, and acked by a
 // broker).
 func (b *Batch) Produced() bool {
-	for _, e := range b.Exchanges {
-		if e.Err() == nil {
-			return true
-		}
-	}
-	return false
+	return len(b.Exchanges) > 0 && b.Exchanges[len(b.Exchanges)-1].Error == nil
 }
 
 func (b *Batch) String() string {
@@ -47,33 +42,35 @@ func (b *Batch) String() string {
 	return string(c)
 }
 
-// Exchange records information about a single Produce api call and response. A batch will have one
-// or more exchanges attached to it.
+var ErrNilResponse = fmt.Errorf("nil response from broker")
+
+func parseResponse(begin time.Time, resp *producer.Response, err error) *Exchange {
+	switch {
+	case err != nil:
+	case resp == nil:
+		err = ErrNilResponse
+	case resp.ErrorCode != libkafka.ERR_NONE:
+		err = &libkafka.Error{Code: resp.ErrorCode}
+	}
+	return &Exchange{
+		Begin:    begin,
+		Complete: time.Now().UTC(),
+		Response: resp,
+		Error:    err,
+	}
+}
+
+// Exchange records information about a single Produce api call and response. A
+// batch will have one or more exchanges attached to it. If Response.ErrorCode
+// != libkafka.ERR_NONE then Error will be set to corresponding libkafka.Error.
 type Exchange struct {
 	Begin    time.Time
 	Complete time.Time
 	Response *producer.Response
-	// This is populated if there was an error getting response from the broker. So things like
-	// network timeouts, broker down, bad protocol version, etc. This being nil means that
-	// response was successfuly read and parsed. But, response itself may contain an error code.
+	// Error indicates that exchange failed. This could be a "low level"
+	// error such as network, or it could be a libkafka.Error, which means
+	// response from the broker had ErrorCode other than ERR_NONE (0).
 	Error error
-}
-
-var ErrNilResponse = fmt.Errorf("nil response from broker")
-
-// Err returns an error if: Exchange.Error is not nil; Exchange.Error is nil but Exchange.Response
-// is nil; Exchange.Error is nil and Exchange.Response.ErrorCode is not NONE.
-func (e *Exchange) Err() error {
-	if e.Error != nil {
-		return e.Error
-	}
-	if e.Response == nil {
-		return ErrNilResponse
-	}
-	if e.Response.ErrorCode != errors.NONE {
-		return &errors.KafkaError{Code: e.Response.ErrorCode}
-	}
-	return nil
 }
 
 // Async producer sends record batches to Kafka. Make sure to set public field values before calling
@@ -94,7 +91,7 @@ type Async struct {
 	// 1 means 1 initial attempt and no retries. 2 means 1 initial attempt and 1 more attempt on
 	// error. Must be >0.
 	NumAttempts int
-	// Sleep this long between repeated produce calls for the same batch.  This is a mixed
+	// Sleep this long between repeated produce calls for the same batch. This is a mixed
 	// thing: if errors to produce are because partition leadership has moved, then it would
 	// make sense to make next call immediately (because the leader would be found etc). But if
 	// there is a problem with leadership / some other kind of slow down, then waiting for a bit
@@ -118,18 +115,10 @@ func (p *Async) produce(b *Batch) {
 	t := time.Now().UTC()
 	partitionProducer := p.producers[partition]
 	resp, err := partitionProducer.Produce(&b.Batch)
-	exchange := &Exchange{
-		Begin:    t,
-		Complete: time.Now().UTC(),
-		Response: resp,
-		Error:    err,
-	}
-	if exchange.Err() != nil {
-		// not getting into the specifics of what the problem is. close the connection, it
-		// will be reopened on the next produce attempt. the expense is not prohibitive if
-		// this is a one-off (say NOT_LEADER_FOR_PARTITION) but if the problem is severe we
-		// are hosed anyway
+	exchange := parseResponse(t, resp, err)
+	if exchange.Error != nil {
 		partitionProducer.Close()
+		exchange.Error = kafkaclient.Errorf("error producing to partition %d: %w", partition, exchange.Error)
 	}
 	b.Exchanges = append(b.Exchanges, exchange)
 }

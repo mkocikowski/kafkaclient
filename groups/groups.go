@@ -5,10 +5,10 @@ import (
 	"sync"
 	"time"
 
+	"github.com/mkocikowski/libkafka"
 	"github.com/mkocikowski/libkafka/api/JoinGroup"
 	"github.com/mkocikowski/libkafka/api/SyncGroup"
 	"github.com/mkocikowski/libkafka/client"
-	"github.com/mkocikowski/libkafka/errors"
 )
 
 type Assigner interface {
@@ -51,8 +51,8 @@ func (c *GroupMembershipManager) join() error {
 	if err != nil {
 		return err
 	}
-	if resp.ErrorCode != errors.NONE {
-		return &errors.KafkaError{Code: resp.ErrorCode}
+	if resp.ErrorCode != libkafka.ERR_NONE {
+		return &libkafka.Error{Code: resp.ErrorCode}
 	}
 	c.memberId = resp.MemberId
 	c.generationId = resp.GenerationId
@@ -77,8 +77,8 @@ func (c *GroupMembershipManager) sync() error {
 	if err != nil {
 		return err
 	}
-	if resp.ErrorCode != errors.NONE {
-		return &errors.KafkaError{Code: resp.ErrorCode}
+	if resp.ErrorCode != libkafka.ERR_NONE {
+		return &libkafka.Error{Code: resp.ErrorCode}
 	}
 	c.assignment = resp.Assignment[:]
 	return nil
@@ -91,8 +91,8 @@ func (c *GroupMembershipManager) heartbeat() error {
 	if err != nil {
 		return err
 	}
-	if resp.ErrorCode != errors.NONE {
-		return &errors.KafkaError{Code: resp.ErrorCode}
+	if resp.ErrorCode != libkafka.ERR_NONE {
+		return &libkafka.Error{Code: resp.ErrorCode}
 	}
 	return nil
 }

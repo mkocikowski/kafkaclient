@@ -22,8 +22,7 @@ const bootstrap = "localhost:9092"
 func createTopic(t *testing.T) string {
 	t.Helper()
 	topic := fmt.Sprintf("test-%x", rand.Uint32())
-	//if _, err := client.CreateTopic(bootstrap, topic, 2, 1); err != nil {
-	if _, err := client.CreateTopic(bootstrap, topic, 1, 1); err != nil {
+	if _, err := client.CallCreateTopic(bootstrap, topic, 1, 1); err != nil {
 		t.Fatal(err)
 	}
 	return topic
@@ -55,6 +54,7 @@ func TestIntegrationProducerSuccess(t *testing.T) {
 	close(in)
 	n := 0
 	for b := range out {
+		t.Log(b)
 		if !b.Produced() {
 			t.Fatalf("%+v", b)
 		}
@@ -103,19 +103,25 @@ func TestUnitBatchProduced(t *testing.T) {
 		e    []*Exchange
 		want bool
 	}{
-		{e: nil, want: false},
-		{e: []*Exchange{&Exchange{}}, want: false},
-		{e: []*Exchange{&Exchange{Error: errors.New("err")}}, want: false},
-		{e: []*Exchange{&Exchange{Response: &producer.Response{}}}, want: true},
-		{e: []*Exchange{&Exchange{Response: &producer.Response{ErrorCode: 1}}}, want: false},
+		{e: nil,
+			want: false},
+		{e: []*Exchange{parseResponse(time.Now(), nil, nil)},
+			want: false},
+		{e: []*Exchange{parseResponse(time.Now(), nil, errors.New("foo"))},
+			want: false},
+		{e: []*Exchange{parseResponse(time.Now(), &producer.Response{ErrorCode: 1}, nil)},
+			want: false},
+		{e: []*Exchange{parseResponse(time.Now(), &producer.Response{}, nil)},
+			want: true},
 		{e: []*Exchange{
-			&Exchange{Response: &producer.Response{ErrorCode: 1}},
-			&Exchange{Response: &producer.Response{}}}, want: true},
+			parseResponse(time.Now(), &producer.Response{ErrorCode: 1}, nil),
+			parseResponse(time.Now(), &producer.Response{}, nil)},
+			want: true},
 	}
-	for _, test := range tests {
+	for i, test := range tests {
 		b := &Batch{Exchanges: test.e}
 		if got := b.Produced(); got != test.want {
-			t.Fatal(got, test.want)
+			t.Fatal(i, got, test.want)
 		}
 	}
 }

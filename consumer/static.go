@@ -4,9 +4,9 @@ import (
 	"log"
 	"sync"
 
+	"github.com/mkocikowski/libkafka"
 	"github.com/mkocikowski/libkafka/client"
 	"github.com/mkocikowski/libkafka/client/fetcher"
-	"github.com/mkocikowski/libkafka/errors"
 )
 
 type Static struct {
@@ -34,13 +34,13 @@ func DefaultHandleFetchResponse(s fetcher.SeekCloser, e *Exchange) {
 		// connection has been closed in libkafka
 		return
 	}
-	if e.ErrorCode == errors.OFFSET_OUT_OF_RANGE {
+	if e.ErrorCode == libkafka.ERR_OFFSET_OUT_OF_RANGE {
 		if err := s.Seek(fetcher.MessageNewest); err != nil {
 			s.Close()
 		}
 		return
 	}
-	if e.ErrorCode != errors.NONE {
+	if e.ErrorCode != libkafka.ERR_NONE {
 		s.Close()
 		return
 	}

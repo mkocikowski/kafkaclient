@@ -16,3 +16,13 @@ github.com/mkocikowski/libkafka v0.0.7-0.20200429205121-3c1e410650ee h1:DYEaLrzS
 github.com/mkocikowski/libkafka v0.0.7-0.20200429205121-3c1e410650ee/go.mod h1:yq/tp+9lNspzf75zi3aFJbXjUlFuduwHgXLKugyMCew=
 github.com/mkocikowski/libkafka v0.0.8 h1:k3IXUgVc7gtHFk0AxLAmlqPWZ+lUX3J110JDh8UFA6U=
 github.com/mkocikowski/libkafka v0.0.8/go.mod h1:yq/tp+9lNspzf75zi3aFJbXjUlFuduwHgXLKugyMCew=
+github.com/mkocikowski/libkafka v0.0.9-0.20200505014657-bd324605a037 h1:4/kp081Fmtd5AeP1irQ7+WfcGErQaFAnMzTfBrAxsIs=
+github.com/mkocikowski/libkafka v0.0.9-0.20200505014657-bd324605a037/go.mod h1:yq/tp+9lNspzf75zi3aFJbXjUlFuduwHgXLKugyMCew=
+github.com/mkocikowski/libkafka v0.0.9-0.20200505152127-593b99d02f39 h1:jfnDQIEsBYtG6cefoUFo7x39Z1OFOUHfL0Iom5umaE0=
+github.com/mkocikowski/libkafka v0.0.9-0.20200505152127-593b99d02f39/go.mod h1:yq/tp+9lNspzf75zi3aFJbXjUlFuduwHgXLKugyMCew=
+github.com/mkocikowski/libkafka v0.0.9-0.20200505172151-8800af82171b h1:x1+8uPfe9R5U/8AXoNpl57bOx7vUKvlSjmMGFbFRDMU=
+github.com/mkocikowski/libkafka v0.0.9-0.20200505172151-8800af82171b/go.mod h1:yq/tp+9lNspzf75zi3aFJbXjUlFuduwHgXLKugyMCew=
+github.com/mkocikowski/libkafka v0.0.9-0.20200505195812-02b1d65d5948 h1:BgycMDVByKyeQ++K2Kc58NsKvWvGHcpPrI/1wBme1IA=
+github.com/mkocikowski/libkafka v0.0.9-0.20200505195812-02b1d65d5948/go.mod h1:yq/tp+9lNspzf75zi3aFJbXjUlFuduwHgXLKugyMCew=
+github.com/mkocikowski/libkafka v0.0.9 h1:y2pckurw/B/dNIOKkhrWf/B8ZYUFPrTMeMftb9Zi4tw=
+github.com/mkocikowski/libkafka v0.0.9/go.mod h1:yq/tp+9lNspzf75zi3aFJbXjUlFuduwHgXLKugyMCew=
