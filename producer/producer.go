@@ -44,6 +44,10 @@ func (b *Batch) String() string {
 
 var ErrNilResponse = fmt.Errorf("nil response from broker")
 
+// Munge through the various produce failure modes and come up with "error / no error" for this
+// particular exchange. There could be a "low level" error (network etc), there could be nil or
+// incomplete response response, and there could could be complete response that carries a kafka
+// error code. Combine all these into single Exchange.Error.
 func parseResponse(begin time.Time, resp *producer.Response, err error) *Exchange {
 	switch {
 	case err != nil:
@@ -118,6 +122,7 @@ func (p *Async) produce(b *Batch) {
 	exchange := parseResponse(t, resp, err)
 	if exchange.Error != nil {
 		partitionProducer.Close()
+		// wrap error in kafkaclient.Error so that it is serialized correctly
 		exchange.Error = kafkaclient.Errorf("error producing to partition %d: %w", partition, exchange.Error)
 	}
 	b.Exchanges = append(b.Exchanges, exchange)
