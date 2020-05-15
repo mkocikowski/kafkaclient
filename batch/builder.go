@@ -22,14 +22,26 @@ type SequentialBuilder struct {
 	// Each batch will have at least this many records. There is no "max": user can send slices
 	// or any size on the input channel. It is up to the user to enforce sanity of input slices.
 	MinRecords int
+	// Each batch will have uncompressed payload (sum of uncompressed record values) of at least
+	// this many bytes. Combined with MinRecords (both have to be true) this determines when to
+	// "flush".
+	MinUncompressedBytes int
 	// Incoming records are collected into sets, the size of which (the number of records in
-	// each set) is determined by MinRecords. Each of these sets of records must be built into
-	// a batch: records need to be serialized into wire format and then compressed. Each set of
-	// records is precessed by a worker and results in a single producer.Batch. NumWorkers
-	// determines the number of workers doing the serialization and compression. This is most
-	// likely the most expensive part of the whole pipeline (especially when compression is
-	// enabled) so set this accordingly (but doesn't make sense for it to be more than the
-	// number of available cores). Must be >0
+	// each set) is determined by MinRecords and MinUncompressedBytes. Each of these sets of
+	// records must be built into a batch: records need to be serialized into wire format and
+	// then compressed.
+
+	// Each set of records is processed by a worker and results in a single producer.Batch.
+	// NumWorkers determines the number of workers doing the serialization and compression. This
+	// is most likely the most expensive part of the whole pipeline (especially when compression
+	// is enabled) so set this accordingly (but doesn't make sense for it to be more than the
+	// number of available cores).
+	//
+	// The depth of the builder output channel is equal to NumWorkers. This means that the
+	// maximum amount of "in flight" batches is 2x NumWorkers: 1x in the output channel and 1x
+	// built and waiting to be flushed. At that point the builder will block.
+	//
+	// Must be >0
 	NumWorkers int
 	//
 	in   <-chan []*libkafka.Record
@@ -40,11 +52,20 @@ type SequentialBuilder struct {
 
 func (b *SequentialBuilder) collectLoop() {
 	var set []*record.Record
-	for r := range b.in {
-		set = append(set, r...)
-		if len(set) >= b.MinRecords {
+	var setBytes int
+	for records := range b.in {
+		for _, r := range records {
+			if r == nil {
+				continue
+			}
+			setBytes += len(r.Value)
+			set = append(set, r)
+		}
+		// "flush"
+		if len(set) >= b.MinRecords && setBytes >= b.MinUncompressedBytes {
 			b.sets <- set
 			set = nil
+			setBytes = 0
 		}
 	}
 	if len(set) > 0 {
@@ -74,13 +95,13 @@ func (b *SequentialBuilder) buildLoop() {
 	}
 }
 
-// Start building batches. Returns channel on which workers return completed batches. When input
-// channel is closed the workers drain it, output any remaining batches (even if smaller than
-// MinRecords), exit, and the output channel is closed. It is more efficient to send multiple
-// records at a time on the input channel but the size of the input slices is independent of
-// MinRecords (and so open to abuse: you could send a huge input slice; up to you to ensure slice
-// sanity). Empty slices passed on input are ignored. If any record is nil, this will result in
-// batch.ErrNilSlice when the batch is built. You should call Start only once.
+// Start building batches. Returns channel on which workers return completed batches. The depth of
+// that channel is equal to the number of workers. When input channel is closed the workers drain
+// it, output any remaining batches (even if smaller than MinRecords), exit, and the output channel
+// is closed. It is more efficient to send multiple records at a time on the input channel but the
+// size of the input slices is independent of MinRecords (and so open to abuse: you could send a
+// huge input slice; up to you to ensure slice sanity). Empty slices and nil records within slices
+// are silently dropped. You should call Start only once.
 func (b *SequentialBuilder) Start(input <-chan []*libkafka.Record) <-chan *producer.Batch {
 	b.in = input
 	b.sets = make(chan []*libkafka.Record, b.NumWorkers)

@@ -4,7 +4,6 @@ import (
 	"testing"
 
 	"github.com/mkocikowski/libkafka"
-	"github.com/mkocikowski/libkafka/batch"
 	"github.com/mkocikowski/libkafka/compression"
 	"github.com/mkocikowski/libkafka/record"
 )
@@ -49,6 +48,24 @@ func TestUnitBuilderBigBatch(t *testing.T) {
 	}
 }
 
+// setting MinRecords=1 but MinUncompressedBytes=4. then adding 2 separate payloads, but the first
+// payload is only 3 bytes. expecting the 2 payloads to get combined
+func TestUnitBuilderFlushOnBytes(t *testing.T) {
+	builder := &SequentialBuilder{
+		Compressor:           &compression.Nop{},
+		MinRecords:           1,
+		MinUncompressedBytes: 4,
+		NumWorkers:           1,
+	}
+	records := make(chan []*libkafka.Record)
+	batches := builder.Start(records)
+	records <- []*libkafka.Record{record.New(nil, []byte("foo"))}
+	records <- []*libkafka.Record{record.New(nil, []byte("bar"))}
+	if b := <-batches; b.NumRecords != 2 {
+		t.Fatal(b, b.NumRecords)
+	}
+}
+
 // setting MinRecords=2 but calling Add with 1 record. then closing the builder to "flush" expect a
 // batch with only 1 record
 func TestUnitBuilderSmallBatchFlush(t *testing.T) {
@@ -82,6 +99,7 @@ func TestUnitBuilderEmptySets(t *testing.T) {
 	}
 }
 
+// expect nil records to be skipped
 func TestUnitBuilderNilRecords(t *testing.T) {
 	builder := &SequentialBuilder{
 		Compressor: &compression.Nop{},
@@ -93,7 +111,7 @@ func TestUnitBuilderNilRecords(t *testing.T) {
 	records <- []*libkafka.Record{}
 	records <- []*libkafka.Record{nil, nil}
 	close(records)
-	if b := <-batches; b.BuildError != batch.ErrNilRecord {
-		t.Fatal(b.BuildError)
+	if b := <-batches; b != nil {
+		t.Fatalf("%+v", b)
 	}
 }
