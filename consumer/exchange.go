@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/mkocikowski/kafkaclient"
 	"github.com/mkocikowski/libkafka"
 	"github.com/mkocikowski/libkafka/batch"
 	"github.com/mkocikowski/libkafka/client/fetcher"
@@ -44,25 +45,31 @@ func (b *Batch) MaxTimestamp() time.Time {
 
 type Exchange struct {
 	fetcher.Response
+	RequestBegin  time.Time
+	ResponseEnd   time.Time
 	RequestError  error
-	Batches       []*Batch
 	InitialOffset int64
 	FinalOffset   int64
+	Batches       []*Batch
+}
+
+func parseResponseBatch(b []byte) *Batch {
+	responseBatch, err := batch.Unmarshal(b)
+	if err != nil {
+		return &Batch{Error: kafkaclient.Errorf("error unmarshaling batch: %w", err)}
+	}
+	return &Batch{Batch: *responseBatch}
 }
 
 func (e *Exchange) parseFetchResponse(r *fetcher.Response, err error) {
 	if err != nil {
-		e.RequestError = err
+		e.RequestError = kafkaclient.Errorf("%w", err)
 		return
 	}
 	e.Response = *r
 	for _, b := range r.RecordSet.Batches() {
-		batch, err := batch.Unmarshal(b)
-		e.Batches = append(e.Batches, &Batch{
-			Batch:     *batch,
-			Topic:     r.Topic,
-			Partition: r.Partition,
-			Error:     err,
-		})
+		batch := parseResponseBatch(b)
+		batch.Topic, batch.Partition = r.Topic, r.Partition
+		e.Batches = append(e.Batches, batch)
 	}
 }

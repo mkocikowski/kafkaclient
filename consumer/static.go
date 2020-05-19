@@ -3,6 +3,7 @@ package consumer
 import (
 	"log"
 	"sync"
+	"time"
 
 	"github.com/mkocikowski/libkafka"
 	"github.com/mkocikowski/libkafka/client"
@@ -64,12 +65,16 @@ func (c *Static) consume() *Exchange {
 	partition := <-c.next
 	defer func() { c.next <- partition }()
 	f := c.fetchers[partition]
-	e := &Exchange{InitialOffset: f.Offset()}
+	e := &Exchange{
+		InitialOffset: f.Offset(),
+		RequestBegin:  time.Now().UTC(),
+	}
 	// topic and partition are not populated when there is a wire error so setting them here so
-	// that errors can be analyzed better
+	// that errors can be analyzed better. have to initialize them like this because they are promoted fields
 	e.Topic = c.Topic
 	e.Partition = int32(partition)
 	e.parseFetchResponse(f.Fetch())
+	e.ResponseEnd = time.Now().UTC()
 	c.HandleResponse(f, e)
 	return e
 }
