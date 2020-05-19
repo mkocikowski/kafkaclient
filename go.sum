@@ -32,3 +32,7 @@ github.com/mkocikowski/libkafka v0.0.10 h1:pshaGa1Q8pyw3fd3FE7MvEL/31ktzv8Ry6kjN
 github.com/mkocikowski/libkafka v0.0.10/go.mod h1:yq/tp+9lNspzf75zi3aFJbXjUlFuduwHgXLKugyMCew=
 github.com/mkocikowski/libkafka v0.0.11-0.20200519164736-4f0111f7aa4e h1:oPtrbU+fiz67LK7wU1iZ7OG+s7g0xwdvOt8qDVWZyCw=
 github.com/mkocikowski/libkafka v0.0.11-0.20200519164736-4f0111f7aa4e/go.mod h1:yq/tp+9lNspzf75zi3aFJbXjUlFuduwHgXLKugyMCew=
+github.com/mkocikowski/libkafka v0.0.11-0.20200519192959-a9e401f1111c h1:lTrfjDjhoRoud9Whvwm/lkrX6pPmAVm6vBFKmFND4Ls=
+github.com/mkocikowski/libkafka v0.0.11-0.20200519192959-a9e401f1111c/go.mod h1:yq/tp+9lNspzf75zi3aFJbXjUlFuduwHgXLKugyMCew=
+github.com/mkocikowski/libkafka v0.0.11-0.20200519193516-8fc6b83bc572 h1:5DPp9Mzy1A3DRftTBC3iWqioJrfLwufWJBLBy6otZfs=
+github.com/mkocikowski/libkafka v0.0.11-0.20200519193516-8fc6b83bc572/go.mod h1:yq/tp+9lNspzf75zi3aFJbXjUlFuduwHgXLKugyMCew=

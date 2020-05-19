@@ -75,6 +75,7 @@ func (c *Static) consume() *Exchange {
 	e.Partition = int32(partition)
 	e.parseFetchResponse(f.Fetch())
 	e.ResponseEnd = time.Now().UTC()
+	e.Leader = f.(*fetcher.PartitionFetcher).Leader() // TODO: suuper hacky fix this!
 	c.HandleResponse(f, e)
 	return e
 }

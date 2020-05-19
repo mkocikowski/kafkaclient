@@ -6,6 +6,7 @@ import (
 
 	"github.com/mkocikowski/kafkaclient"
 	"github.com/mkocikowski/libkafka"
+	"github.com/mkocikowski/libkafka/api/Metadata"
 	"github.com/mkocikowski/libkafka/batch"
 	"github.com/mkocikowski/libkafka/client/fetcher"
 	"github.com/mkocikowski/libkafka/record"
@@ -45,6 +46,7 @@ func (b *Batch) MaxTimestamp() time.Time {
 
 type Exchange struct {
 	fetcher.Response
+	Leader        *Metadata.Broker
 	RequestBegin  time.Time
 	ResponseEnd   time.Time
 	RequestError  error
