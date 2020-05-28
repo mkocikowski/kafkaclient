@@ -1,15 +1,29 @@
 package consumer
 
 import (
-	"log"
 	"sync"
 	"time"
 
-	"github.com/mkocikowski/libkafka"
 	"github.com/mkocikowski/libkafka/client"
 	"github.com/mkocikowski/libkafka/client/fetcher"
 )
 
+// ResponseHandlerFunc is a signature of function that handles (mostly) failure logic for exchanges,
+// and the logic for advancing (and maybe committing) offsets. There are many failure scenarios and
+// many ways to handle them; instead of getting into config hell, I decided to make the logic
+// injectable, provide a default implementation (DefaultHandleFetchResponse), but then let users
+// provide their own logic if they want to.
+//
+// The handler func gets a FetcherSeekerCloser (implemented by libkafka fetcher.PartitionFetcher),
+// and the exchange (after the response has been parsed and batches have been unmarshaled). It is
+// expected that exchange be mutated by the function.
+//
+// The response handler must advance the fetcher offset (Seeker.SetOffset) or every fetch call will
+// read from the same offset. This is different from "commiting" offsets (which is storing them in
+// kafka to survive client restarts).
+type ResponseHandlerFunc func(FetcherSeekerCloser, *Exchange)
+
+// Static consumer consumes from a static list of topic partitions.
 type Static struct {
 	// Kafka bootstrap either host:port or SRV
 	Bootstrap      string
@@ -20,45 +34,11 @@ type Static struct {
 	MaxBytes       int32
 	MaxWaitTimeMs  int32
 	//
-	//fetchers map[int]*fetcher.PartitionFetcher
-	fetchers map[int]fetcher.Fetcher
+	fetchers map[int]FetcherSeekerCloser
 	next     chan int
 	out      chan *Exchange
 	done     chan struct{}
 	wg       sync.WaitGroup
-}
-
-type ResponseHandlerFunc func(fetcher.SeekCloser, *Exchange)
-
-func DefaultHandleFetchResponse(s fetcher.SeekCloser, e *Exchange) {
-	if e.RequestError != nil {
-		// connection has been closed in libkafka
-		return
-	}
-	if e.ErrorCode == libkafka.ERR_OFFSET_OUT_OF_RANGE {
-		if err := s.Seek(fetcher.MessageNewest); err != nil {
-			s.Close()
-		}
-		return
-	}
-	if e.ErrorCode != libkafka.ERR_NONE {
-		s.Close()
-		return
-	}
-	offset := e.InitialOffset
-	for _, batch := range e.Batches {
-		if batch.Error != nil {
-			// TODO: DO NOT log from library
-			log.Printf("error parsing batch: %v", batch.Error)
-			continue
-		}
-		offset = batch.LastOffset() + 1
-		// if the last batch fail it will be retried next time (offset
-		// will not be advanced past it). if a batch "in the middle"
-		// fails it will be skipped (offset will be advanced past it).
-	}
-	s.SetOffset(offset)
-	e.FinalOffset = offset
 }
 
 func (c *Static) consume() *Exchange {
@@ -66,16 +46,14 @@ func (c *Static) consume() *Exchange {
 	defer func() { c.next <- partition }()
 	f := c.fetchers[partition]
 	e := &Exchange{
+		Response: fetcher.Response{
+			Topic:     c.Topic,
+			Partition: int32(partition),
+		},
 		InitialOffset: f.Offset(),
 		RequestBegin:  time.Now().UTC(),
 	}
-	// topic and partition are not populated when there is a wire error so setting them here so
-	// that errors can be analyzed better. have to initialize them like this because they are promoted fields
-	e.Topic = c.Topic
-	e.Partition = int32(partition)
-	e.parseFetchResponse(f.Fetch())
-	e.ResponseEnd = time.Now().UTC()
-	e.Leader = f.(*fetcher.PartitionFetcher).Leader() // TODO: suuper hacky fix this!
+	e.parseResponse(f.Fetch())
 	c.HandleResponse(f, e)
 	return e
 }
@@ -91,8 +69,10 @@ func (c *Static) run() {
 	}
 }
 
+// Start consuming. Pass in map[partition]offset. You must read exchanges from the returned channel
+// or consumer will block. You should only call Start once.
 func (c *Static) Start(partitionOffsets map[int32]int64) (<-chan *Exchange, error) {
-	c.fetchers = make(map[int]fetcher.Fetcher)
+	c.fetchers = make(map[int]FetcherSeekerCloser)
 	c.next = make(chan int, len(partitionOffsets))
 	for partition, offset := range partitionOffsets {
 		p := int(partition)
@@ -127,10 +107,13 @@ func (c *Static) Start(partitionOffsets map[int32]int64) (<-chan *Exchange, erro
 	return c.out, nil
 }
 
+// Stop consuming. Any request-response currently in flight will continue. You should drain the
+// output exchanges channel, which will be closed once it has been drained.
 func (p *Static) Stop() {
 	close(p.done)
 }
 
+// Wait for the consumer to fully stop. You need to drain the output exchanges channel.
 func (p *Static) Wait() {
 	p.wg.Wait()
 }
