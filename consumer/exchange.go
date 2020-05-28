@@ -1,13 +1,13 @@
 package consumer
 
 import (
-	"fmt"
 	"time"
 
 	"github.com/mkocikowski/kafkaclient"
 	"github.com/mkocikowski/libkafka"
 	"github.com/mkocikowski/libkafka/batch"
 	"github.com/mkocikowski/libkafka/client/fetcher"
+	"github.com/mkocikowski/libkafka/compression"
 	"github.com/mkocikowski/libkafka/record"
 )
 
@@ -65,29 +65,47 @@ func parseResponseBatch(b []byte) *Batch {
 	if err != nil {
 		return &Batch{Error: kafkaclient.Errorf("error unmarshaling batch: %w", err)}
 	}
-	return &Batch{Batch: *responseBatch}
+	return &Batch{
+		Batch:           *responseBatch,
+		CompressedBytes: responseBatch.BatchLengthBytes,
+	}
 }
 
 // Batch is the unit at which data it fetched from kafka. A successful fetch request will return one
 // or more batches. Each batch, if unmarshaled successfully, will have one or more records in it.
 type Batch struct {
 	libkafka.Batch
-	Topic     string
-	Partition int32
-	Error     error
+	Topic           string
+	Partition       int32
+	Error           error
+	CompressedBytes int32
 }
 
-// Records retrieves individual records from the batch. A batch has one or more records. Compression
-// is applied at batch level, so to retrieve records batch data needs to be decompressed first.
-// Decompressors is a map keyed by codec ids from libkafka.compression package. You pass in all
-// available decompressors, and Records picks the right one based on the batch metadata.
-func (b *Batch) Records(decompressors map[int16]batch.Decompressor) ([]*record.Record, error) {
+var ErrCodecNotFound = kafkaclient.Errorf("codec not found")
+
+// Decompress the batch. Decompressing a batch that is not compressed is a nop. Mutates the batch.
+// If Batch.Error is not nil Decompress is a nop. Sets Batch.Error on error. Not safe for concurrent
+// use.
+func (b *Batch) Decompress(decompressors map[int16]batch.Decompressor) {
+	if b.Error != nil {
+		return
+	}
 	d := decompressors[b.Batch.CompressionType()]
 	if d == nil {
-		return nil, fmt.Errorf("no decompressor for type %d", b.Batch.CompressionType())
+		b.Error = ErrCodecNotFound
+		return
 	}
 	if err := b.Batch.Decompress(d); err != nil {
-		return nil, err
+		b.Error = err
+	}
+}
+
+var ErrBatchCompressed = kafkaclient.Errorf("batch is compressed")
+
+// Records retrieves individual records from the batch. Batch must be decompressed.
+func (b *Batch) Records() ([]*record.Record, error) {
+	if b.Batch.CompressionType() != compression.None {
+		return nil, ErrBatchCompressed
 	}
 	recordsBytes := b.Batch.Records()
 	records := make([]*record.Record, len(recordsBytes))

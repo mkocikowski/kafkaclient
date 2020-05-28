@@ -44,14 +44,16 @@ func TestUnitParseResponseNil(t *testing.T) {
 	}
 }
 
-func TestUnitGetRecords(t *testing.T) {
+func TestUnitBatchGetRecords(t *testing.T) {
 	recordSet, _ := base64.StdEncoding.DecodeString(recordSetFixture)
 	resp := &fetcher.Response{RecordSet: recordSet}
 	e := &Exchange{}
 	e.parseResponse(resp, nil)
 	b := e.Batches[1]
-	decompressors := map[int16]batch.Decompressor{compression.None: &compression.Nop{}}
-	records, err := b.Records(decompressors)
+	if b.CompressedBytes != 75 {
+		t.Fatal(b.CompressedBytes)
+	}
+	records, err := b.Records()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -62,9 +64,37 @@ func TestUnitGetRecords(t *testing.T) {
 	if s := string(r.Value); s != "banana" {
 		t.Fatal(s)
 	}
-	//
-	delete(decompressors, compression.None)
-	if _, err := b.Records(decompressors); err == nil {
-		t.Fatal(`expected "no decompressor" error`)
+}
+
+type mockGzip struct{}
+
+func (*mockGzip) Compress(b []byte) ([]byte, error)   { return b, nil }
+func (*mockGzip) Decompress(b []byte) ([]byte, error) { return b, nil }
+func (*mockGzip) Type() int16                         { return compression.Gzip }
+
+func TestUnitBatchDecompress(t *testing.T) {
+	recordSet, _ := base64.StdEncoding.DecodeString(recordSetFixture)
+	resp := &fetcher.Response{RecordSet: recordSet}
+	e := &Exchange{}
+	e.parseResponse(resp, nil)
+	b := e.Batches[1]
+	if err := b.Compress(&mockGzip{}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := b.Records(); err != ErrBatchCompressed {
+		t.Fatal(err)
+	}
+	b.Decompress(nil)
+	if b.Error != ErrCodecNotFound {
+		t.Fatal(b.Error)
+	}
+	b.Error = nil // need to reset otherwise Decode is nop
+	b.Decompress(map[int16]batch.Decompressor{compression.Gzip: &mockGzip{}})
+	records, err := b.Records()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if s := string(records[1].Value); s != "banana" {
+		t.Fatal(s)
 	}
 }
