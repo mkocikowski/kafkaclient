@@ -42,7 +42,12 @@ type Static struct {
 }
 
 func (c *Static) consume() *Exchange {
-	partition := <-c.next
+	var partition int
+	select {
+	case partition = <-c.next:
+	case <-c.done:
+		return nil
+	}
 	defer func() { c.next <- partition }()
 	f := c.fetchers[partition]
 	e := &Exchange{
@@ -60,12 +65,11 @@ func (c *Static) consume() *Exchange {
 
 func (c *Static) run() {
 	for {
-		select {
-		case <-c.done:
+		exchange := c.consume()
+		if exchange == nil {
 			return
-		default:
 		}
-		c.out <- c.consume()
+		c.out <- exchange
 	}
 }
 
