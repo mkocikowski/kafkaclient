@@ -27,17 +27,25 @@ func assignRandomPartitions(members []JoinGroup.Member, partitions []int32) map[
 	return assignments
 }
 
-func (p *RandomPartition) Assign(members []JoinGroup.Member) ([]SyncGroup.Assignment, error) {
-	if len(members) == 0 { // not leader
-		return []SyncGroup.Assignment{}, nil
-	}
-	leaders, err := client.GetPartitionLeaders(p.Bootstrap, p.Topic)
+func getPartitions(bootstrap, topic string) ([]int32, error) {
+	meta, err := client.CallMetadata(bootstrap, []string{topic})
 	if err != nil {
 		return nil, err
 	}
 	var partitions []int32
-	for p, _ := range leaders {
+	for p, _ := range meta.Partitions(topic) {
 		partitions = append(partitions, p)
+	}
+	return partitions, nil
+}
+
+func (p *RandomPartition) Assign(members []JoinGroup.Member) ([]SyncGroup.Assignment, error) {
+	if len(members) == 0 { // not leader
+		return []SyncGroup.Assignment{}, nil
+	}
+	partitions, err := getPartitions(p.Bootstrap, p.Topic)
+	if err != nil {
+		return nil, err
 	}
 	assignments := []SyncGroup.Assignment{}
 	for m, p := range assignRandomPartitions(members, partitions) {
