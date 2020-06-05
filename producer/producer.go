@@ -153,7 +153,7 @@ func (p *Async) run() {
 // exit, and close the output channel. You should call Start only once.
 func (p *Async) Start(input <-chan *Batch) (<-chan *Batch, error) {
 	if len(p.Partitions) == 0 {
-		return nil, fmt.Errorf("no partitions to produce to")
+		return nil, fmt.Errorf("no partitions")
 	}
 	p.producers = make(map[int]*producer.PartitionProducer)
 	p.next = make(chan int, len(p.Partitions))
