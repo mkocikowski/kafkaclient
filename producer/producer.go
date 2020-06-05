@@ -83,6 +83,8 @@ type Async struct {
 	// Kafka bootstrap either host:port or SRV
 	Bootstrap string
 	Topic     string
+	// Produce to these partitions.
+	Partitions []int
 	// Spin up this many workers. Each worker is synchronous. Each worker processes one batch at
 	// a time trying to send it to a random partition. On error the worker retries up to
 	// NumRetries each time trying to send the batch to a different partition. Details are
@@ -150,21 +152,17 @@ func (p *Async) run() {
 // closed the workers drain it, send any remaining batches to kafka, output the final batches,
 // exit, and close the output channel. You should call Start only once.
 func (p *Async) Start(input <-chan *Batch) (<-chan *Batch, error) {
-	leaders, err := client.GetPartitionLeaders(p.Bootstrap, p.Topic)
-	if err != nil {
-		return nil, err
-	}
-	if len(leaders) == 0 {
-		return nil, fmt.Errorf("no leaders for topic %v", p.Topic)
+	if len(p.Partitions) == 0 {
+		return nil, fmt.Errorf("no partitions to produce to")
 	}
 	p.producers = make(map[int]*producer.PartitionProducer)
-	p.next = make(chan int, len(leaders))
-	for partition, _ := range leaders {
+	p.next = make(chan int, len(p.Partitions))
+	for partition, _ := range p.Partitions {
 		p.producers[int(partition)] = &producer.PartitionProducer{
 			PartitionClient: client.PartitionClient{
 				Bootstrap: p.Bootstrap,
 				Topic:     p.Topic,
-				Partition: partition,
+				Partition: int32(partition),
 			},
 			Acks:      int16(p.Acks),
 			TimeoutMs: int32(p.Timeout / time.Millisecond),

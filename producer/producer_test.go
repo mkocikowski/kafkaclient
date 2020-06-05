@@ -33,6 +33,7 @@ func TestIntegrationProducerSuccess(t *testing.T) {
 	p := &Async{
 		Bootstrap:   "localhost:9092",
 		Topic:       topic,
+		Partitions:  []int{0},
 		NumWorkers:  10,
 		NumAttempts: 3,
 		Acks:        1,
@@ -72,6 +73,7 @@ func TestIntegrationProducerBadTopic(t *testing.T) {
 	p := &Async{
 		Bootstrap:   "localhost:9092",
 		Topic:       topic,
+		Partitions:  []int{0},
 		NumWorkers:  10,
 		NumAttempts: 3,
 		Acks:        1,
