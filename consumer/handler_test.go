@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/mkocikowski/libkafka"
+	"github.com/mkocikowski/libkafka/batch"
 	"github.com/mkocikowski/libkafka/client/fetcher"
 )
 
@@ -38,12 +39,20 @@ func TestUnitDefaultHandleFetchResponse(t *testing.T) {
 		t.Fatal(f.offset)
 	}
 	if f.closed {
-		t.Fatal("expected open")
+		t.Fatal(f.closed)
 	}
-	// now simulate and error that should result in connection getting closed
+	// now simulate an error that should result in connection getting closed
 	e.ErrorCode = libkafka.ERR_LEADER_NOT_AVAILABLE
 	DefaultHandleFetchResponse(f, e)
 	if !f.closed {
-		t.Fatal("expected closed")
+		t.Fatal(f.closed)
+	}
+	// now situation where all batches have errors
+	e.ErrorCode = libkafka.ERR_NONE
+	e.Batches[0].Error = batch.CorruptedBatchError
+	e.Batches[1].Error = batch.CorruptedBatchError
+	DefaultHandleFetchResponse(f, e)
+	if f.offset != -1 {
+		t.Fatal(f.offset)
 	}
 }
