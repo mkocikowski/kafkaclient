@@ -22,6 +22,9 @@ type Fetcher interface {
 }
 
 type Seeker interface {
+	// Seek sets the offset to close to the specified timestamp. On error
+	// offset is not changed. Offset is not guaranteed to be aligned on
+	// batch boundaries.
 	Seek(time.Time) error
 	Offset() int64
 	SetOffset(int64)
@@ -61,6 +64,11 @@ func DefaultHandleFetchResponse(f FetcherSeekerCloser, e *Exchange) {
 		// if the last batch fail it will be retried next time (offset
 		// will not be advanced past it). if a batch "in the middle"
 		// fails it will be skipped (offset will be advanced past it).
+		// NOTE: there is an edge case where all batches in a fetch
+		// response are "bad". in that case, the initial offset will
+		// not move at all, and, if errors persist on subsequent calls,
+		// the consumer will effectively be "stuck". TODO: figure out
+		// how to get around this
 	}
 	// this is not "commiting" offset. this is just moving the fetcher's offset to the end of
 	// the last batch, so that on the next call to Fetch it will start from the right place. if
