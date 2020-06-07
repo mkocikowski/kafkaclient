@@ -31,6 +31,16 @@ func TestUnitBatchGetRecords(t *testing.T) {
 	}
 }
 
+// expected behavior is that if the batch already has an error, then calling
+// Records will return that same error
+func TestUnitBatchGetRecordsError(t *testing.T) {
+	b := &Batch{Error: ErrCodecNotFound}
+	_, err := b.Records()
+	if err != ErrCodecNotFound {
+		t.Fatal(err)
+	}
+}
+
 type mockGzip struct{}
 
 func (*mockGzip) Compress(b []byte) ([]byte, error)   { return b, nil }
