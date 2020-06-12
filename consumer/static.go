@@ -8,19 +8,17 @@ import (
 	"github.com/mkocikowski/libkafka/client/fetcher"
 )
 
-// ResponseHandlerFunc is a signature of function that handles (mostly) failure logic for exchanges,
-// and the logic for advancing (and maybe committing) offsets. There are many failure scenarios and
-// many ways to handle them; instead of getting into config hell, I decided to make the logic
-// injectable, provide a default implementation (DefaultHandleFetchResponse), but then let users
-// provide their own logic if they want to.
+// ResponseHandlerFunc is a signature of function that handles logic for
+// processing fetch responses. Its most important job is to advance the fetcher
+// offset (Seeker.SetOffset) or every fetch call will read from the same
+// offset. There are many subtle failure scenarios for fetch requests, and so
+// the logic for advancing the offsets may be complex.
 //
-// The handler func gets a FetcherSeekerCloser (implemented by libkafka fetcher.PartitionFetcher),
-// and the exchange (after the response has been parsed and batches have been unmarshaled). It is
-// expected that exchange be mutated by the function.
+// Instead of getting into config hell, I decided to make the logic injectable.
+// I'm also providing a default implementation DefaultHandleFetchResponse.
 //
-// The response handler must advance the fetcher offset (Seeker.SetOffset) or every fetch call will
-// read from the same offset. This is different from "commiting" offsets (which is storing them in
-// kafka to survive client restarts).
+// The handler is called after the response has been parsed and the batches
+// have been unmarshaled. The exchange may be mutated by the handler.
 type ResponseHandlerFunc func(FetcherSeekerCloser, *Exchange)
 
 // Static consumer consumes from a static list of topic partitions.
@@ -73,8 +71,9 @@ func (c *Static) run() {
 	}
 }
 
-// Start consuming. Pass in map[partition]offset. You must read exchanges from the returned channel
-// or consumer will block. You should only call Start once.
+// Start consuming. Pass in map[partition]offset. You must read exchanges from
+// the returned channel or consumer will block. You should only call Start
+// once (up to you, there are no safeguards).
 func (c *Static) Start(partitionOffsets map[int32]int64) (<-chan *Exchange, error) {
 	c.fetchers = make(map[int]FetcherSeekerCloser)
 	c.next = make(chan int, len(partitionOffsets))
@@ -111,13 +110,15 @@ func (c *Static) Start(partitionOffsets map[int32]int64) (<-chan *Exchange, erro
 	return c.out, nil
 }
 
-// Stop consuming. Any request-response currently in flight will continue. You should drain the
-// output exchanges channel, which will be closed once it has been drained.
+// Stop consuming. Any request-response currently in flight will continue. You
+// should drain the output exchanges channel, which will be closed once it has
+// been drained.
 func (p *Static) Stop() {
 	close(p.done)
 }
 
-// Wait for the consumer to fully stop. You need to drain the output exchanges channel.
+// Wait for the consumer to fully stop. You need to drain the output exchanges
+// channel.
 func (p *Static) Wait() {
 	p.wg.Wait()
 }

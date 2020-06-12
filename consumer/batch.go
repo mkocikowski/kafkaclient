@@ -21,8 +21,9 @@ func parseResponseBatch(b []byte) *Batch {
 	}
 }
 
-// Batch is the unit at which data it fetched from kafka. A successful fetch request will return one
-// or more batches. Each batch, if unmarshaled successfully, will have one or more records in it.
+// Batch is the unit at which data it fetched from kafka. A successful fetch
+// request will return one or more batches. Each batch, if unmarshaled
+// successfully, will have one or more records in it.
 type Batch struct {
 	libkafka.Batch
 	Topic           string
@@ -33,9 +34,9 @@ type Batch struct {
 
 var ErrCodecNotFound = kafkaclient.Errorf("codec not found")
 
-// Decompress the batch. Decompressing a batch that is not compressed is a nop. Mutates the batch.
-// If Batch.Error is not nil Decompress is a nop. Sets Batch.Error on error. Not safe for concurrent
-// use.
+// Decompress the batch. Decompressing a batch that is not compressed is a nop.
+// Mutates the batch.  If Batch.Error is not nil Decompress is a nop. Sets
+// Batch.Error on error. Not safe for concurrent use.
 func (b *Batch) Decompress(decompressors map[int16]batch.Decompressor) {
 	if b.Error != nil {
 		return
@@ -52,7 +53,8 @@ func (b *Batch) Decompress(decompressors map[int16]batch.Decompressor) {
 
 var ErrBatchCompressed = kafkaclient.Errorf("batch is compressed")
 
-// Records retrieves individual records from the batch. Batch must be decompressed.
+// Records retrieves individual records from the batch. Batch must be
+// decompressed.
 func (b *Batch) Records() ([]*record.Record, error) {
 	if b.Error != nil {
 		return nil, b.Error

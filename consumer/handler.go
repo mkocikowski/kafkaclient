@@ -75,11 +75,6 @@ func DefaultHandleFetchResponse(f FetcherSeekerCloser, e *Exchange) {
 		// if the last batch fail it will be retried next time (offset
 		// will not be advanced past it). if a batch "in the middle"
 		// fails it will be skipped (offset will be advanced past it).
-		// NOTE: there is an edge case where all batches in a fetch
-		// response are "bad". in that case, the initial offset will
-		// not move at all, and, if errors persist on subsequent calls,
-		// the consumer will effectively be "stuck". TODO: figure out
-		// how to get around this
 	}
 	if nextOffset == e.InitialOffset {
 		// this happens when the response was successful, there were
