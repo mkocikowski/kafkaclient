@@ -115,3 +115,35 @@ func TestUnitBuilderNilRecords(t *testing.T) {
 		t.Fatalf("%+v", b)
 	}
 }
+
+/*
+mik:batch$ go test . -bench=Builder -run=xxx -cpu=1,4,8
+goos: linux
+goarch: amd64
+pkg: github.com/mkocikowski/kafkaclient/batch
+BenchmarkBuilder           33391             30090 ns/op
+BenchmarkBuilder-4         37789             33003 ns/op
+BenchmarkBuilder-8         36254             34245 ns/op
+PASS
+ok      github.com/mkocikowski/kafkaclient/batch        4.523s
+*/
+func BenchmarkBuilder(b *testing.B) {
+	builder := &SequentialBuilder{
+		Compressor: &compression.Nop{},
+		MinRecords: 100,
+		NumWorkers: 1,
+	}
+	records := make(chan []*libkafka.Record)
+	batches := builder.Start(records)
+	go func() {
+		for _ = range batches {
+		}
+	}()
+	r := []*libkafka.Record{}
+	for i := 0; i < 100; i++ {
+		r = append(r, record.New([]byte{uint8(i)}, []byte("foo")))
+	}
+	for i := 0; i < b.N; i++ {
+		records <- r
+	}
+}
