@@ -20,7 +20,10 @@ import (
 // to methods that mutate them recording additional information.
 type Batch struct {
 	libkafka.Batch
-	Topic             string
+	Topic string
+	// Partition to which the batch is to be produced. Special value -1
+	// means "next partition round robin". Zero value (0) means "produce to
+	// partition 0". So be careful with that.
 	Partition         int32
 	BuildBegin        time.Time
 	BuildComplete     time.Time
@@ -28,6 +31,7 @@ type Batch struct {
 	CompressComplete  time.Time
 	CompressError     error
 	UncompressedBytes int32       // batch size can't be more than MaxInt32
+	ProducerError     error       // for example ErrNoProducerForPartition
 	Exchanges         []*Exchange // each exchange records a Produce api call and response
 }
 
@@ -116,24 +120,59 @@ type Async struct {
 }
 
 func (p *Async) produce(b *Batch) {
-	partition := <-p.next // TODO: time how long the wait is here
+	var partition int
+	for {
+		// there is one producer per partition, and all workers share
+		// the producer pool. "next" acts as a semaphore, ensuring only
+		// one worker is producing to a given partition at a time. so
+		// here we claim a partition. if the required partition is "-1"
+		// then we pick the first available partition. otherwise, if
+		// specific partition is requested, we keep claiming and
+		// releasing partitions until we get the one we want. relative
+		// inefficiency of this approach doesn't matter given realistic
+		// number of partitions and batch production rate. we guard
+		// against infinite loop (where the requested partition is not
+		// in the list of partitions) in the calling function, which
+		// checks if the producer is configured for the requested
+		// partition.
+		partition = <-p.next
+		if b.Partition == -1 || b.Partition == int32(partition) {
+			break
+		}
+		p.next <- partition
+	}
 	defer func() { p.next <- partition }()
-	t := time.Now().UTC()
 	partitionProducer := p.producers[partition]
+	t := time.Now().UTC()
 	resp, err := partitionProducer.Produce(&b.Batch)
 	exchange := parseResponse(t, resp, err)
 	if exchange.Error != nil {
 		partitionProducer.Close()
 		// wrap error in kafkaclient.Error so that it is serialized correctly
-		exchange.Error = kafkaclient.Errorf("error producing to partition %d: %w", partition, exchange.Error)
+		exchange.Error = kafkaclient.Errorf(
+			"error producing to partition %d: %w", partition, exchange.Error)
 	}
 	b.Exchanges = append(b.Exchanges, exchange)
 }
 
+// ErrNoProducerForPartition is set for batch.ProducerError when the producer
+// is not configured to produce to partition specified in batch.Partition. This
+// does not necessarily mean that the partition does not exist, just that the
+// producer was not configured to write to it.
+var ErrNoProducerForPartition = kafkaclient.Errorf("no producer for partition")
+
 func (p *Async) run() {
 	for b := range p.in {
-		if (b.BuildError != nil) || (b.CompressError != nil) {
-			p.out <- b // don't even attempt to send
+		// it is possible that a batch is sent from the batch builder
+		// specifying partition for which there is no producer (this
+		// SHOULD not happen, but could). check for that here.
+		if _, ok := p.producers[int(b.Partition)]; b.Partition != -1 && !ok {
+			b.ProducerError = ErrNoProducerForPartition
+		}
+		// if there is any error building the batch, or there is no
+		// producer for the partition, don't even attempt an exchange
+		if b.BuildError != nil || b.CompressError != nil || b.ProducerError != nil {
+			p.out <- b
 			continue
 		}
 		for i := 0; i < p.NumAttempts; i++ {
