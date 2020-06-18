@@ -10,9 +10,10 @@ import (
 
 func TestUnitBuilderStartStop(t *testing.T) {
 	builder := &SequentialBuilder{
-		Compressor: &compression.Nop{},
-		MinRecords: 1,
-		NumWorkers: 1,
+		Compressor:  &compression.Nop{},
+		MinRecords:  1,
+		NumWorkers:  1,
+		Partitioner: &NopPartitioner{},
 	}
 	records := make(chan []*libkafka.Record)
 	batches := builder.Start(records)
@@ -24,18 +25,22 @@ func TestUnitBuilderStartStop(t *testing.T) {
 	if b.UncompressedBytes != b.BatchLengthBytes {
 		t.Fatal(b.UncompressedBytes, b.BatchLengthBytes)
 	}
+	if b.Partition != -1 { // NopPartitioner
+		t.Fatal(b.Partition)
+	}
 	close(records)
 	if _, ok := <-batches; ok {
 		t.Fatal("expected output to be closed")
 	}
 }
 
-// setting MinRecords=1 but calling Add with 2 records. expect a single batch of 2 records
-func TestUnitBuilderBigBatch(t *testing.T) {
+// setting MinRecords=1 but calling Add with 2 records. expect 2 batches of 1 record
+func TestUnitBuilderBigSet(t *testing.T) {
 	builder := &SequentialBuilder{
-		Compressor: &compression.Nop{},
-		MinRecords: 1,
-		NumWorkers: 1,
+		Compressor:  &compression.Nop{},
+		MinRecords:  1,
+		NumWorkers:  1,
+		Partitioner: &NopPartitioner{},
 	}
 	records := make(chan []*libkafka.Record)
 	batches := builder.Start(records)
@@ -43,8 +48,29 @@ func TestUnitBuilderBigBatch(t *testing.T) {
 		record.New(nil, []byte("foo")),
 		record.New(nil, []byte("bar")),
 	}
-	if b := <-batches; b.NumRecords != 2 {
+	if b := <-batches; b.NumRecords != 1 {
 		t.Fatal(b, b.NumRecords)
+	}
+	if b := <-batches; b.NumRecords != 1 {
+		t.Fatal(b, b.NumRecords)
+	}
+}
+
+// setting MinRecords=1 but calling Add with 2 records. expect 2 batches of 1 record
+func TestUnitBuilderPartitioned(t *testing.T) {
+	builder := &SequentialBuilder{
+		Compressor:  &compression.Nop{},
+		MinRecords:  1,
+		NumWorkers:  1,
+		Partitioner: &HashPartitioner{numPartitions: 10},
+	}
+	records := make(chan []*libkafka.Record)
+	batches := builder.Start(records)
+	records <- []*libkafka.Record{
+		record.New([]byte("foo"), []byte("foo")),
+	}
+	if b := <-batches; b.Partition != 3 {
+		t.Fatal(b, b.Partition)
 	}
 }
 
@@ -56,6 +82,7 @@ func TestUnitBuilderFlushOnBytes(t *testing.T) {
 		MinRecords:           1,
 		MinUncompressedBytes: 4,
 		NumWorkers:           1,
+		Partitioner:          &NopPartitioner{},
 	}
 	records := make(chan []*libkafka.Record)
 	batches := builder.Start(records)
@@ -70,9 +97,10 @@ func TestUnitBuilderFlushOnBytes(t *testing.T) {
 // batch with only 1 record
 func TestUnitBuilderSmallBatchFlush(t *testing.T) {
 	builder := &SequentialBuilder{
-		Compressor: &compression.Nop{},
-		MinRecords: 2,
-		NumWorkers: 1,
+		Compressor:  &compression.Nop{},
+		MinRecords:  2,
+		NumWorkers:  1,
+		Partitioner: &NopPartitioner{},
 	}
 	records := make(chan []*libkafka.Record)
 	batches := builder.Start(records)
@@ -85,9 +113,10 @@ func TestUnitBuilderSmallBatchFlush(t *testing.T) {
 
 func TestUnitBuilderEmptySets(t *testing.T) {
 	builder := &SequentialBuilder{
-		Compressor: &compression.Nop{},
-		MinRecords: 1,
-		NumWorkers: 1,
+		Compressor:  &compression.Nop{},
+		MinRecords:  1,
+		NumWorkers:  1,
+		Partitioner: &NopPartitioner{},
 	}
 	records := make(chan []*libkafka.Record)
 	batches := builder.Start(records)
@@ -102,9 +131,10 @@ func TestUnitBuilderEmptySets(t *testing.T) {
 // expect nil records to be skipped
 func TestUnitBuilderNilRecords(t *testing.T) {
 	builder := &SequentialBuilder{
-		Compressor: &compression.Nop{},
-		MinRecords: 1,
-		NumWorkers: 1,
+		Compressor:  &compression.Nop{},
+		MinRecords:  1,
+		NumWorkers:  1,
+		Partitioner: &NopPartitioner{},
 	}
 	records := make(chan []*libkafka.Record)
 	batches := builder.Start(records)
@@ -129,9 +159,43 @@ ok      github.com/mkocikowski/kafkaclient/batch        4.523s
 */
 func BenchmarkBuilder(b *testing.B) {
 	builder := &SequentialBuilder{
-		Compressor: &compression.Nop{},
-		MinRecords: 100,
-		NumWorkers: 1,
+		Compressor:  &compression.Nop{},
+		MinRecords:  100,
+		NumWorkers:  1,
+		Partitioner: &NopPartitioner{},
+	}
+	records := make(chan []*libkafka.Record)
+	batches := builder.Start(records)
+	go func() {
+		for _ = range batches {
+		}
+	}()
+	r := []*libkafka.Record{}
+	for i := 0; i < 100; i++ {
+		r = append(r, record.New([]byte{uint8(i)}, []byte("foo")))
+	}
+	for i := 0; i < b.N; i++ {
+		records <- r
+	}
+}
+
+/*
+mik:batch$ go test . -bench=BuilderPartitioned -run=xxx -cpu=1,4,8
+goos: linux
+goarch: amd64
+pkg: github.com/mkocikowski/kafkaclient/batch
+BenchmarkBuilderPartitioned                31688             35553 ns/op
+BenchmarkBuilderPartitioned-4              33046             38427 ns/op
+BenchmarkBuilderPartitioned-8              29829             39553 ns/op
+PASS
+ok      github.com/mkocikowski/kafkaclient/batch        4.745s
+*/
+func BenchmarkBuilderPartitioned(b *testing.B) {
+	builder := &SequentialBuilder{
+		Compressor:  &compression.Nop{},
+		MinRecords:  100,
+		NumWorkers:  1,
+		Partitioner: &HashPartitioner{numPartitions: 100},
 	}
 	records := make(chan []*libkafka.Record)
 	batches := builder.Start(records)
