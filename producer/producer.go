@@ -157,7 +157,7 @@ func (p *Async) Start(input <-chan *Batch) (<-chan *Batch, error) {
 	}
 	p.producers = make(map[int]*producer.PartitionProducer)
 	p.next = make(chan int, len(p.Partitions))
-	for partition, _ := range p.Partitions {
+	for _, partition := range p.Partitions {
 		p.producers[int(partition)] = &producer.PartitionProducer{
 			PartitionClient: client.PartitionClient{
 				Bootstrap: p.Bootstrap,
