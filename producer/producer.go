@@ -20,10 +20,14 @@ import (
 // to methods that mutate them recording additional information.
 type Batch struct {
 	libkafka.Batch
+	// Topic is set by the producer. Batches received from the builder have
+	// no topic set, producer sets it before attempting first exchange.
 	Topic string
-	// Partition to which the batch is to be produced. Special value -1
-	// means "next partition round robin". Zero value (0) means "produce to
-	// partition 0". So be careful with that.
+	// Partition to which the batch is intended to be produced. Special
+	// value -1 means "next partition round robin". Zero value (0) means
+	// "produce to partition 0". So be careful with that. To see the
+	// partition to which the batch ended up actually being produced (or
+	// attempted) see the Exchanges (.Response.Topic).
 	Partition         int32
 	BuildBegin        time.Time
 	BuildComplete     time.Time
@@ -148,9 +152,10 @@ func (p *Async) produce(b *Batch) {
 	exchange := parseResponse(t, resp, err)
 	if exchange.Error != nil {
 		partitionProducer.Close()
-		// wrap error in kafkaclient.Error so that it is serialized correctly
+		// wrap error in kafkaclient.Error for json serialization
 		exchange.Error = kafkaclient.Errorf(
-			"error producing to partition %d: %w", partition, exchange.Error)
+			"error producing topic %s partition %d: %w",
+			b.Topic, partition, exchange.Error)
 	}
 	b.Exchanges = append(b.Exchanges, exchange)
 }
@@ -163,6 +168,7 @@ var ErrNoProducerForPartition = kafkaclient.Errorf("no producer for partition")
 
 func (p *Async) run() {
 	for b := range p.in {
+		b.Topic = p.Topic
 		// it is possible that a batch is sent from the batch builder
 		// specifying partition for which there is no producer (this
 		// SHOULD not happen, but could). check for that here.
