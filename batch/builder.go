@@ -103,6 +103,10 @@ func (b *SequentialBuilder) buildLoop() {
 		builder := batch.NewBuilder(time.Now().UTC())
 		builder.Add(buf.records...)
 		t := time.Now().UTC()
+		// builder.Build returns error if batch is empty or if there is
+		// a nil record somewhere in the batch. The way the records are
+		// collected in the SequentialBuilder collect loop ensures that
+		// neither of these happens, so error SHOULD always be nil.
 		batch, err := builder.Build(time.Now().UTC())
 		producerBatch := &producer.Batch{
 			Partition:     buf.partition,
@@ -120,13 +124,16 @@ func (b *SequentialBuilder) buildLoop() {
 	}
 }
 
-// Start building batches. Returns channel on which workers return completed batches. The depth of
-// that channel is equal to the number of workers. When input channel is closed the workers drain
-// it, output any remaining batches (even if smaller than MinRecords), exit, and the output channel
-// is closed. It is more efficient to send multiple records at a time on the input channel but the
-// size of the input slices is independent of MinRecords (and so open to abuse: you could send a
-// huge input slice; up to you to ensure slice sanity). Empty slices and nil records within slices
-// are silently dropped. You should call Start only once.
+// Start building batches. Returns channel on which workers return completed
+// batches. The depth of that channel is equal to the number of workers. When
+// input channel is closed the workers drain it, output any remaining batches
+// (even if smaller than MinRecords), exit, and the output channel is closed.
+// It is more efficient to send multiple records at a time on the input channel
+// but the size of the input slices is independent of MinRecords (and so open
+// to abuse: you could send a huge input slice; up to you to ensure slice
+// sanity). Empty slices and nil records within slices are silently dropped,
+// and so batches returned on the output channel SHOULD always be error free
+// and have >0 records. You should call Start only once.
 func (b *SequentialBuilder) Start(input <-chan []*libkafka.Record) <-chan *producer.Batch {
 	b.in = input
 	b.collected = make(chan *buffer, b.NumWorkers)
