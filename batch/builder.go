@@ -69,6 +69,7 @@ type buffer struct {
 	records   []*libkafka.Record
 	bytes     int
 	partition int32
+	t         time.Time // used to measure how long the buffer has to wait to be picked up by a builder
 }
 
 func (b *SequentialBuilder) collectLoop() {
@@ -81,12 +82,17 @@ func (b *SequentialBuilder) collectLoop() {
 			partition := b.Partitioner.Partition(r.Key)
 			buf := buffers[partition]
 			if buf == nil {
-				buf = &buffer{partition: partition}
+				buf = &buffer{
+					partition: partition,
+					// TODO(optimize): ??? records: make([]*libkafka.Record, 0, b.MinRecords),
+					// would this be a significant performance advantage when dealing with multiple partitions ?
+				}
 				buffers[partition] = buf
 			}
 			buf.records = append(buf.records, r)
 			buf.bytes += len(r.Value)
 			if len(buf.records) >= b.MinRecords && buf.bytes >= b.MinUncompressedBytes {
+				buf.t = time.Now()
 				b.collected <- buf
 				delete(buffers, partition)
 			}
@@ -100,9 +106,10 @@ func (b *SequentialBuilder) collectLoop() {
 
 func (b *SequentialBuilder) buildLoop() {
 	for buf := range b.collected {
-		builder := batch.NewBuilder(time.Now().UTC())
-		builder.Add(buf.records...)
 		t := time.Now().UTC()
+		builder := batch.NewBuilder(time.Now().UTC())
+		// TODO(optimize): ??? would it make sense to have builder.Set as opposed to Add which copies the slice ?
+		builder.Add(buf.records...)
 		// builder.Build returns error if batch is empty or if there is
 		// a nil record somewhere in the batch. The way the records are
 		// collected in the SequentialBuilder collect loop ensures that
@@ -111,6 +118,7 @@ func (b *SequentialBuilder) buildLoop() {
 		producerBatch := &producer.Batch{
 			Partition:     buf.partition,
 			BuildError:    err,
+			BuildEnqueued: buf.t,
 			BuildBegin:    t,
 			BuildComplete: time.Now().UTC(),
 		}

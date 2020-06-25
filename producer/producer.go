@@ -29,6 +29,7 @@ type Batch struct {
 	// partition to which the batch ended up actually being produced (or
 	// attempted) see the Exchanges (.Response.Topic).
 	Partition         int32
+	BuildEnqueued     time.Time
 	BuildBegin        time.Time
 	BuildComplete     time.Time
 	BuildError        error
@@ -50,32 +51,21 @@ func (b *Batch) String() string {
 	return string(c)
 }
 
-var ErrNilResponse = fmt.Errorf("nil response from broker")
-
-// Munge through the various produce failure modes and come up with "error / no error" for this
-// particular exchange. There could be a "low level" error (network etc), there could be nil or
-// incomplete response response, and there could could be complete response that carries a kafka
-// error code. Combine all these into single Exchange.Error.
-func parseResponse(begin time.Time, resp *producer.Response, err error) *Exchange {
-	switch {
-	case err != nil:
-	case resp == nil:
-		err = ErrNilResponse
-	case resp.ErrorCode != libkafka.ERR_NONE:
-		err = &libkafka.Error{Code: resp.ErrorCode}
-	}
-	return &Exchange{
-		Begin:    begin,
-		Complete: time.Now().UTC(),
-		Response: resp,
-		Error:    err,
-	}
-}
-
 // Exchange records information about a single Produce api call and response. A
 // batch will have one or more exchanges attached to it. If Response.ErrorCode
 // != libkafka.ERR_NONE then Error will be set to corresponding libkafka.Error.
 type Exchange struct {
+	// Enqueued records the time the producer started "looking" for a
+	// worker to make the produce request. Delta between Enqueued and Begin
+	// shows how long it took to get a worker. This delta can be reduced by
+	// increasing the number of produce workers (unless all requests are to
+	// produce to a single partition, in which case the number of produce
+	// workers doesn't matter).
+	Enqueued time.Time
+	// Begin records the time the kafka produce call began. Delta between
+	// that and Complete shows how long it took to send the request over
+	// the wire and for kafka to respond to it. Large delta indicates
+	// problems on kafka side.
 	Begin    time.Time
 	Complete time.Time
 	Response *producer.Response
@@ -123,7 +113,35 @@ type Async struct {
 	wg        sync.WaitGroup
 }
 
+var ErrNilResponse = fmt.Errorf("nil response from broker")
+
+func produce(p *producer.PartitionProducer, b *libkafka.Batch) *Exchange {
+	t := time.Now().UTC()
+	resp, err := p.Produce(b)
+	switch {
+	case err != nil:
+	case resp == nil:
+		err = ErrNilResponse
+	case resp.ErrorCode != libkafka.ERR_NONE:
+		err = &libkafka.Error{Code: resp.ErrorCode}
+	}
+	if err != nil {
+		p.Close()
+		// wrap error in kafkaclient.Error for json serialization
+		err = kafkaclient.Errorf(
+			"error producing topic %s partition %d: %w",
+			p.Topic, p.Partition, err)
+	}
+	return &Exchange{
+		Begin:    t,
+		Complete: time.Now().UTC(),
+		Response: resp,
+		Error:    err,
+	}
+}
+
 func (p *Async) produce(b *Batch) {
+	t := time.Now().UTC()
 	var partition int
 	for {
 		// there is one producer per partition, and all workers share
@@ -147,16 +165,8 @@ func (p *Async) produce(b *Batch) {
 	}
 	defer func() { p.next <- partition }()
 	partitionProducer := p.producers[partition]
-	t := time.Now().UTC()
-	resp, err := partitionProducer.Produce(&b.Batch)
-	exchange := parseResponse(t, resp, err)
-	if exchange.Error != nil {
-		partitionProducer.Close()
-		// wrap error in kafkaclient.Error for json serialization
-		exchange.Error = kafkaclient.Errorf(
-			"error producing topic %s partition %d: %w",
-			b.Topic, partition, exchange.Error)
-	}
+	exchange := produce(partitionProducer, &b.Batch)
+	exchange.Enqueued = t
 	b.Exchanges = append(b.Exchanges, exchange)
 }
 

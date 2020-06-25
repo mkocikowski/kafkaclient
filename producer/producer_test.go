@@ -1,7 +1,6 @@
 package producer
 
 import (
-	"errors"
 	"fmt"
 	"math/rand"
 	"testing"
@@ -9,7 +8,6 @@ import (
 
 	"github.com/mkocikowski/libkafka/batch"
 	"github.com/mkocikowski/libkafka/client"
-	"github.com/mkocikowski/libkafka/client/producer"
 	"github.com/mkocikowski/libkafka/compression"
 )
 
@@ -160,17 +158,9 @@ func TestUnitBatchProduced(t *testing.T) {
 	}{
 		{e: nil,
 			want: false},
-		{e: []*Exchange{parseResponse(time.Now(), nil, nil)},
+		{e: []*Exchange{&Exchange{Error: fmt.Errorf("foo")}},
 			want: false},
-		{e: []*Exchange{parseResponse(time.Now(), nil, errors.New("foo"))},
-			want: false},
-		{e: []*Exchange{parseResponse(time.Now(), &producer.Response{ErrorCode: 1}, nil)},
-			want: false},
-		{e: []*Exchange{parseResponse(time.Now(), &producer.Response{}, nil)},
-			want: true},
-		{e: []*Exchange{
-			parseResponse(time.Now(), &producer.Response{ErrorCode: 1}, nil),
-			parseResponse(time.Now(), &producer.Response{}, nil)},
+		{e: []*Exchange{&Exchange{Error: fmt.Errorf("foo")}, &Exchange{}},
 			want: true},
 	}
 	for i, test := range tests {
