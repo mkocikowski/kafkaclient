@@ -103,8 +103,17 @@ type Async struct {
 	// even more complicated if data is partitioned (right now delivery is to random partition).
 	// Anyway. Feel free to set to 0.
 	SleepBetweenAttempts time.Duration
-	Acks                 int
-	Timeout              time.Duration
+	// StrictPartitioning, when true, attempts to write each batch into the
+	// partition which was set for it by the batch builder. This means that
+	// if the partition is not available for some reason, the producer will
+	// keep trying (up to NumAttempts) and then possibly lose data. If
+	// StrictPartitioning is false, then after the first error the
+	// partition for the batch will be set to -1 (meaning "first available"
+	// round robin). If the batch builder does not partition (all batches
+	// have partition set to -1) then this setting does nothing.
+	StrictPartitioning bool
+	Acks               int
+	Timeout            time.Duration
 	//
 	producers map[int]*producer.PartitionProducer
 	next      chan int
@@ -115,6 +124,7 @@ type Async struct {
 
 var ErrNilResponse = fmt.Errorf("nil response from broker")
 
+// conveninence function to make produce call and parse + format errors
 func produce(p *producer.PartitionProducer, b *libkafka.Batch) *Exchange {
 	t := time.Now().UTC()
 	resp, err := p.Produce(b)
@@ -126,7 +136,6 @@ func produce(p *producer.PartitionProducer, b *libkafka.Batch) *Exchange {
 		err = &libkafka.Error{Code: resp.ErrorCode}
 	}
 	if err != nil {
-		p.Close()
 		// wrap error in kafkaclient.Error for json serialization
 		err = kafkaclient.Errorf(
 			"error producing topic %s partition %d: %w",
@@ -167,6 +176,18 @@ func (p *Async) produce(b *Batch) {
 	partitionProducer := p.producers[partition]
 	exchange := produce(partitionProducer, &b.Batch)
 	exchange.Enqueued = t
+	if exchange.Error != nil {
+		partitionProducer.Close()
+		// if partitioning is strict, then all subsequent calls will
+		// attempt to write to the original partition. this may fail if
+		// the partition is for some reason not available, and result
+		// in data loss. if partitioning is not strict, then following
+		// the first failure batch partition is set to -1 meaning
+		// "first available" partition
+		if !p.StrictPartitioning {
+			b.Partition = -1
+		}
+	}
 	b.Exchanges = append(b.Exchanges, exchange)
 }
 

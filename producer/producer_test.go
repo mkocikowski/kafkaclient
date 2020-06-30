@@ -106,6 +106,16 @@ func TestIntegrationProducerPartitioned(t *testing.T) {
 	if !resp.Produced() || resp.Exchanges[0].Response.Partition != 9 {
 		t.Logf("%+v", resp)
 	}
+	// now "break" the connection for 1 partition. here error is caused by
+	// a "dirty" close of the underlying connection. since
+	// StrictPartitioning==false, i expect the partition to be set to -1
+	p.producers[9].Conn().Close()
+	in <- &Batch{Batch: *b, Partition: 9}
+	resp = <-out
+	if !resp.Produced() || resp.Partition != -1 || len(resp.Exchanges) != 2 {
+		t.Logf("%+v", resp)
+	}
+	//
 	// now partition which exist, but for which there is no producer
 	in <- &Batch{Batch: *b, Partition: 8}
 	resp = <-out
