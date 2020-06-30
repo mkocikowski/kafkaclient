@@ -60,6 +60,7 @@ type SequentialBuilder struct {
 	Partitioner Partitioner
 	//
 	in        <-chan []*libkafka.Record
+	flush     chan time.Duration
 	out       chan *producer.Batch
 	collected chan *buffer
 	wg        sync.WaitGroup
@@ -69,35 +70,52 @@ type buffer struct {
 	records   []*libkafka.Record
 	bytes     int
 	partition int32
-	t         time.Time // used to measure how long the buffer has to wait to be picked up by a builder
+	started   time.Time
+	enqueued  time.Time
 }
 
 func (b *SequentialBuilder) collectLoop() {
 	buffers := make(map[int32]*buffer)
-	for records := range b.in {
-		for _, r := range records {
-			if r == nil {
-				continue
-			}
-			partition := b.Partitioner.Partition(r.Key)
-			buf := buffers[partition]
-			if buf == nil {
-				buf = &buffer{
-					partition: partition,
-					// TODO(optimize): ??? records: make([]*libkafka.Record, 0, b.MinRecords),
-					// would this be a significant performance advantage when dealing with multiple partitions ?
+LOOP:
+	for {
+		select {
+		case d := <-b.flush:
+			for partition, buf := range buffers {
+				if time.Since(buf.started) > d {
+					buf.enqueued = time.Now()
+					b.collected <- buf
+					delete(buffers, partition)
 				}
-				buffers[partition] = buf
 			}
-			buf.records = append(buf.records, r)
-			buf.bytes += len(r.Value)
-			if len(buf.records) >= b.MinRecords && buf.bytes >= b.MinUncompressedBytes {
-				buf.t = time.Now()
-				b.collected <- buf
-				delete(buffers, partition)
+			continue LOOP
+		case records, ok := <-b.in:
+			if !ok {
+				break LOOP
+			}
+			for _, r := range records {
+				if r == nil {
+					continue
+				}
+				partition := b.Partitioner.Partition(r.Key)
+				buf := buffers[partition]
+				if buf == nil {
+					buf = &buffer{
+						partition: partition,
+						started:   time.Now().UTC(),
+					}
+					buffers[partition] = buf
+				}
+				buf.records = append(buf.records, r)
+				buf.bytes += len(r.Value)
+				if len(buf.records) >= b.MinRecords && buf.bytes >= b.MinUncompressedBytes {
+					buf.enqueued = time.Now()
+					b.collected <- buf
+					delete(buffers, partition)
+				}
 			}
 		}
-	}
+
+	} // end LOOP
 	for _, buf := range buffers {
 		b.collected <- buf
 	}
@@ -118,7 +136,7 @@ func (b *SequentialBuilder) buildLoop() {
 		producerBatch := &producer.Batch{
 			Partition:     buf.partition,
 			BuildError:    err,
-			BuildEnqueued: buf.t,
+			BuildEnqueued: buf.enqueued,
 			BuildBegin:    t,
 			BuildComplete: time.Now().UTC(),
 		}
@@ -144,6 +162,7 @@ func (b *SequentialBuilder) buildLoop() {
 // and have >0 records. You should call Start only once.
 func (b *SequentialBuilder) Start(input <-chan []*libkafka.Record) <-chan *producer.Batch {
 	b.in = input
+	b.flush = make(chan time.Duration, 1)
 	b.collected = make(chan *buffer, b.NumWorkers)
 	go b.collectLoop()
 	b.out = make(chan *producer.Batch, b.NumWorkers)
@@ -159,4 +178,21 @@ func (b *SequentialBuilder) Start(input <-chan []*libkafka.Record) <-chan *produ
 		close(b.out)
 	}()
 	return b.out
+}
+
+// Flush all batches "older" than d. If the builder is partitioned, will look
+// through all partition batches; if the builder is not partitioned, there is
+// only 1 batch. This takes precedence over MinRecords and
+// MinUncompressedBytes. Passing d=0 immediately flushes all batches. Empty
+// batches are never flushed. Does not block. If there is already a flush
+// enqueued / in progress, flush returns immediately as nop.
+func (b *SequentialBuilder) Flush(d time.Duration) {
+	select {
+	case b.flush <- d:
+	default:
+	}
+	// i don't close b.flush at any point. this does not result in a leak,
+	// and keeps me from needing to deal with panics when sending to closed
+	// channel. if no one is receiving from the channel (collect loop has
+	// exited) then this is a nop.
 }

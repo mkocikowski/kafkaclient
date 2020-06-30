@@ -146,6 +146,25 @@ func TestUnitBuilderNilRecords(t *testing.T) {
 	}
 }
 
+func TestUnitBuilderFlush(t *testing.T) {
+	builder := &SequentialBuilder{
+		Compressor:  &compression.Nop{},
+		MinRecords:  10,
+		NumWorkers:  1,
+		Partitioner: &NopPartitioner{},
+	}
+	records := make(chan []*libkafka.Record)
+	batches := builder.Start(records)
+	records <- []*libkafka.Record{
+		record.New(nil, []byte("foo")),
+		record.New(nil, []byte("bar")),
+	}
+	builder.Flush(0) // 0 flushes everything
+	if b := <-batches; b.NumRecords != 2 {
+		t.Fatal(b, b.NumRecords)
+	}
+}
+
 /*
 mik:batch$ go test . -bench=Builder -run=xxx -cpu=1,4,8
 goos: linux
