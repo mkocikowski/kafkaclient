@@ -112,8 +112,16 @@ type Async struct {
 	// round robin). If the batch builder does not partition (all batches
 	// have partition set to -1) then this setting does nothing.
 	StrictPartitioning bool
-	Acks               int
-	Timeout            time.Duration
+	// ConnMaxIdle is passed down to libkafa client.PartitionClient. See
+	// documentation there. Should be less than connections.max.idle.ms
+	// specified in broker config.
+	ConnMaxIdle time.Duration
+	// Acks required. 0 no acks, 1 leader only, -1 all ISRs (as specified
+	// by min.insync.replicas).
+	Acks int
+	// Timeout to set for kafka produce api calls. This determines how long
+	// the broker waits to get all required acks from replicas.
+	Timeout time.Duration
 	//
 	producers map[int]*producer.PartitionProducer
 	next      chan int
@@ -236,9 +244,10 @@ func (p *Async) Start(input <-chan *Batch) (<-chan *Batch, error) {
 	for _, partition := range p.Partitions {
 		p.producers[int(partition)] = &producer.PartitionProducer{
 			PartitionClient: client.PartitionClient{
-				Bootstrap: p.Bootstrap,
-				Topic:     p.Topic,
-				Partition: int32(partition),
+				Bootstrap:   p.Bootstrap,
+				Topic:       p.Topic,
+				Partition:   int32(partition),
+				ConnMaxIdle: p.ConnMaxIdle,
 			},
 			Acks:      int16(p.Acks),
 			TimeoutMs: int32(p.Timeout / time.Millisecond),
