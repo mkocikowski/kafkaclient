@@ -1,5 +1,5 @@
-// Package batch implements a concurrent record batch builder.
-package batch
+// Package builder implements a partitioning record batch builder.
+package builder
 
 import (
 	"sync"
@@ -9,6 +9,11 @@ import (
 	"github.com/mkocikowski/libkafka"
 	"github.com/mkocikowski/libkafka/batch"
 )
+
+type Record interface {
+	Key() []byte
+	Value() []byte
+}
 
 type Partitioner interface {
 	// Partition must be safe for concurrent use. Nil is a valid value for
@@ -59,7 +64,7 @@ type SequentialBuilder struct {
 	// to number of partitions plus NumWorkers. See NopPartitioner.
 	Partitioner Partitioner
 	//
-	in        <-chan []*libkafka.Record
+	in        <-chan []Record
 	flush     chan time.Duration
 	out       chan *producer.Batch
 	collected chan *buffer
@@ -96,7 +101,7 @@ LOOP:
 				if r == nil {
 					continue
 				}
-				partition := b.Partitioner.Partition(r.Key)
+				partition := b.Partitioner.Partition(r.Key())
 				buf := buffers[partition]
 				if buf == nil {
 					buf = &buffer{
@@ -105,9 +110,11 @@ LOOP:
 					}
 					buffers[partition] = buf
 				}
-				buf.records = append(buf.records, r)
-				buf.bytes += len(r.Value)
-				if len(buf.records) >= b.MinRecords && buf.bytes >= b.MinUncompressedBytes {
+				libkRecord := libkafka.NewRecord(r.Key(), r.Value())
+				buf.records = append(buf.records, libkRecord)
+				buf.bytes += len(libkRecord.Value)
+				if len(buf.records) >= b.MinRecords &&
+					buf.bytes >= b.MinUncompressedBytes {
 					buf.enqueued = time.Now()
 					b.collected <- buf
 					delete(buffers, partition)
@@ -126,7 +133,8 @@ func (b *SequentialBuilder) buildLoop() {
 	for buf := range b.collected {
 		t := time.Now().UTC()
 		builder := batch.NewBuilder(time.Now().UTC())
-		// TODO(optimize): ??? would it make sense to have builder.Set as opposed to Add which copies the slice ?
+		// TODO(optimize): ??? would it make sense to have builder.Set
+		// as opposed to Add which copies the slice ?
 		builder.Add(buf.records...)
 		// builder.Build returns error if batch is empty or if there is
 		// a nil record somewhere in the batch. The way the records are
@@ -160,7 +168,7 @@ func (b *SequentialBuilder) buildLoop() {
 // sanity). Empty slices and nil records within slices are silently dropped,
 // and so batches returned on the output channel SHOULD always be error free
 // and have >0 records. You should call Start only once.
-func (b *SequentialBuilder) Start(input <-chan []*libkafka.Record) <-chan *producer.Batch {
+func (b *SequentialBuilder) Start(input <-chan []Record) <-chan *producer.Batch {
 	b.in = input
 	b.flush = make(chan time.Duration, 1)
 	b.collected = make(chan *buffer, b.NumWorkers)
