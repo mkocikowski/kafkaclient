@@ -53,7 +53,7 @@ func (c *DumbOffsetsManager) Fetch(topic string, partition int32) (int64, error)
 
 // Commit makes a single CommitOffset api call. See Fetch documentation for
 // info on error handling.
-func (c DumbOffsetsManager) Commit(topic string, partition int32, offset int64) error {
+func (c *DumbOffsetsManager) Commit(topic string, partition int32, offset int64) error {
 	c.init() // idempotent
 	err := c.client.CommitOffset(topic, partition, offset, -1)
 	if err != nil {
