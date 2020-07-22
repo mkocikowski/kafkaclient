@@ -63,3 +63,8 @@ func (c DumbOffsetsManager) Commit(topic string, partition int32, offset int64) 
 	}
 	return err
 }
+
+func (c *DumbOffsetsManager) Close() error {
+	// nop
+	return nil
+}
