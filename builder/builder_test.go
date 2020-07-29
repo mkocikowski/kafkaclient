@@ -1,7 +1,10 @@
 package builder
 
 import (
+	"fmt"
+	"math/rand"
 	"testing"
+	"time"
 
 	"github.com/mkocikowski/libkafka/compression"
 )
@@ -173,68 +176,51 @@ func TestUnitBuilderFlush(t *testing.T) {
 	}
 }
 
-/*
-mik:batch$ go test . -bench=Builder -run=xxx -cpu=1,4,8
-goos: linux
-goarch: amd64
-pkg: github.com/mkocikowski/kafkaclient/batch
-BenchmarkBuilder           33391             30090 ns/op
-BenchmarkBuilder-4         37789             33003 ns/op
-BenchmarkBuilder-8         36254             34245 ns/op
-PASS
-ok      github.com/mkocikowski/kafkaclient/batch        4.523s
-*/
 func BenchmarkBuilder(b *testing.B) {
-	builder := &SequentialBuilder{
-		Compressor:  &compression.Nop{},
-		MinRecords:  100,
-		NumWorkers:  1,
-		Partitioner: &NopPartitioner{},
-	}
-	records := make(chan []Record)
-	batches := builder.Start(records)
-	go func() {
-		for _ = range batches {
-		}
-	}()
 	r := []Record{}
 	for i := 0; i < 100; i++ {
-		r = append(r, &recordT{[]byte{uint8(i)}, []byte("foo")})
-	}
-	for i := 0; i < b.N; i++ {
-		records <- r
-	}
-}
-
-/*
-mik:batch$ go test . -bench=BuilderPartitioned -run=xxx -cpu=1,4,8
-goos: linux
-goarch: amd64
-pkg: github.com/mkocikowski/kafkaclient/batch
-BenchmarkBuilderPartitioned                31688             35553 ns/op
-BenchmarkBuilderPartitioned-4              33046             38427 ns/op
-BenchmarkBuilderPartitioned-8              29829             39553 ns/op
-PASS
-ok      github.com/mkocikowski/kafkaclient/batch        4.745s
-*/
-func BenchmarkBuilderPartitioned(b *testing.B) {
-	builder := &SequentialBuilder{
-		Compressor:  &compression.Nop{},
-		MinRecords:  100,
-		NumWorkers:  1,
-		Partitioner: &HashPartitioner{numPartitions: 100},
-	}
-	records := make(chan []Record)
-	batches := builder.Start(records)
-	go func() {
-		for _ = range batches {
+		v := make([]byte, 2751)
+		if n, _ := rand.Read(v); n != 2751 {
+			b.Fatal(n)
 		}
-	}()
-	r := []Record{}
-	for i := 0; i < 100; i++ {
-		r = append(r, &recordT{[]byte{uint8(i)}, []byte("foo")})
+		r = append(r, &recordT{[]byte{uint8(i)}, v})
 	}
-	for i := 0; i < b.N; i++ {
-		records <- r
+	benchmarks := []struct {
+		numWorkers  int
+		partitioner Partitioner
+	}{
+		{1, &NopPartitioner{}},
+		{10, &NopPartitioner{}},
+		{100, &NopPartitioner{}},
+		{1000, &NopPartitioner{}},
+		{10000, &NopPartitioner{}},
+		{1, &HashPartitioner{10}},
+		{10, &HashPartitioner{10}},
+		{100, &HashPartitioner{10}},
+		{1000, &HashPartitioner{10}},
+		{10000, &HashPartitioner{10}},
+	}
+	for _, bm := range benchmarks {
+		name := fmt.Sprintf("workers:%d:%T", bm.numWorkers, bm.partitioner)
+		b.Run(name, func(b *testing.B) {
+			builder := &SequentialBuilder{
+				Compressor:  &compression.Nop{},
+				MinRecords:  100,
+				NumWorkers:  bm.numWorkers,
+				Partitioner: bm.partitioner,
+			}
+			records := make(chan []Record)
+			batches := builder.Start(records)
+			go func() {
+				for _ = range batches {
+				}
+			}()
+			b.ResetTimer()
+			for i := 0; i < b.N; i++ {
+				records <- r
+			}
+			close(records)
+		})
+		time.Sleep(time.Second)
 	}
 }
