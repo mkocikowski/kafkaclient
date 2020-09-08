@@ -4,7 +4,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/mkocikowski/kafkaclient"
+	"github.com/mkocikowski/kafkaclient/errors"
 	"github.com/mkocikowski/libkafka/client"
 )
 
@@ -45,7 +45,7 @@ func (c *DumbOffsetsManager) Fetch(topic string, partition int32) (int64, error)
 	offset, err := c.client.FetchOffset(topic, partition)
 	if err != nil {
 		c.client.Close() // will reconnect on next call
-		err = kafkaclient.Errorf("error for topic %s partition %d: %w",
+		err = errors.Format("error for topic %s partition %d: %w",
 			topic, partition, err)
 	}
 	return offset, err
@@ -58,7 +58,7 @@ func (c *DumbOffsetsManager) Commit(topic string, partition int32, offset int64)
 	err := c.client.CommitOffset(topic, partition, offset, -1)
 	if err != nil {
 		c.client.Close() // will reconnect on next call
-		err = kafkaclient.Errorf("error for topic %s partition %d: %w",
+		err = errors.Format("error for topic %s partition %d: %w",
 			topic, partition, err)
 	}
 	return err

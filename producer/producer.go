@@ -7,7 +7,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/mkocikowski/kafkaclient"
+	"github.com/mkocikowski/kafkaclient/errors"
 	"github.com/mkocikowski/libkafka"
 	"github.com/mkocikowski/libkafka/client"
 	"github.com/mkocikowski/libkafka/client/producer"
@@ -144,8 +144,7 @@ func produce(p *producer.PartitionProducer, b *libkafka.Batch) *Exchange {
 		err = &libkafka.Error{Code: resp.ErrorCode}
 	}
 	if err != nil {
-		// wrap error in kafkaclient.Error for json serialization
-		err = kafkaclient.Errorf(
+		err = errors.Format(
 			"error producing topic %s partition %d: %w",
 			p.Topic, p.Partition, err)
 	}
@@ -203,7 +202,7 @@ func (p *Async) produce(b *Batch) {
 // is not configured to produce to partition specified in batch.Partition. This
 // does not necessarily mean that the partition does not exist, just that the
 // producer was not configured to write to it.
-var ErrNoProducerForPartition = kafkaclient.Errorf("no producer for partition")
+var ErrNoProducerForPartition = errors.New("no producer for partition")
 
 func (p *Async) run() {
 	for b := range p.in {

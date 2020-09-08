@@ -5,6 +5,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/mkocikowski/kafkaclient/errors"
 	"github.com/mkocikowski/kafkaclient/producer"
 	"github.com/mkocikowski/libkafka"
 	"github.com/mkocikowski/libkafka/batch"
@@ -143,14 +144,14 @@ func (b *SequentialBuilder) buildLoop() {
 		batch, err := builder.Build(time.Now().UTC())
 		producerBatch := &producer.Batch{
 			Partition:     buf.partition,
-			BuildError:    err,
+			BuildError:    errors.Wrap(err),
 			BuildEnqueued: buf.enqueued,
 			BuildBegin:    t,
 			BuildComplete: time.Now().UTC(),
 		}
 		if err == nil {
 			producerBatch.UncompressedBytes = batch.BatchLengthBytes
-			producerBatch.CompressError = batch.Compress(b.Compressor)
+			producerBatch.CompressError = errors.Wrap(batch.Compress(b.Compressor))
 			producerBatch.CompressComplete = time.Now().UTC()
 			producerBatch.Batch = *batch
 		}

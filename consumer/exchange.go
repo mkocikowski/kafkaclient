@@ -3,7 +3,7 @@ package consumer
 import (
 	"time"
 
-	"github.com/mkocikowski/kafkaclient"
+	"github.com/mkocikowski/kafkaclient/errors"
 	"github.com/mkocikowski/libkafka/client/fetcher"
 )
 
@@ -41,12 +41,12 @@ type Exchange struct {
 	Batches []*Batch
 }
 
-var ErrNilResponse = kafkaclient.Errorf("nil response from broker")
+var ErrNilResponse = errors.New("nil response from broker")
 
 func (e *Exchange) parseResponse(resp *fetcher.Response, err error) {
 	e.ResponseEnd = time.Now().UTC()
 	if err != nil {
-		e.RequestError = kafkaclient.Errorf("%w", err)
+		e.RequestError = errors.Format("%w", err)
 		return
 	}
 	if resp == nil {

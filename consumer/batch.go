@@ -3,7 +3,7 @@ package consumer
 import (
 	"time"
 
-	"github.com/mkocikowski/kafkaclient"
+	"github.com/mkocikowski/kafkaclient/errors"
 	"github.com/mkocikowski/libkafka"
 	"github.com/mkocikowski/libkafka/batch"
 	"github.com/mkocikowski/libkafka/compression"
@@ -13,7 +13,7 @@ import (
 func parseResponseBatch(b []byte) *Batch {
 	responseBatch, err := batch.Unmarshal(b) // this is not so cheap TODO: lazy ?
 	if err != nil {
-		return &Batch{Error: kafkaclient.Errorf("error unmarshaling batch: %w", err)}
+		return &Batch{Error: errors.Format("error unmarshaling batch: %w", err)}
 	}
 	return &Batch{
 		Batch:           *responseBatch,
@@ -32,7 +32,7 @@ type Batch struct {
 	CompressedBytes int32
 }
 
-var ErrCodecNotFound = kafkaclient.Errorf("codec not found")
+var ErrCodecNotFound = errors.New("codec not found")
 
 // Decompress the batch. Decompressing a batch that is not compressed is a nop.
 // Mutates the batch.  If Batch.Error is not nil Decompress is a nop. Sets
@@ -51,7 +51,7 @@ func (b *Batch) Decompress(decompressors map[int16]batch.Decompressor) {
 	}
 }
 
-var ErrBatchCompressed = kafkaclient.Errorf("batch is compressed")
+var ErrBatchCompressed = errors.New("batch is compressed")
 
 // Records retrieves individual records from the batch. Batch must be
 // decompressed.
