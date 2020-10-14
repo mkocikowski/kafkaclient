@@ -30,7 +30,9 @@ type Static struct {
 	HandleResponse ResponseHandlerFunc
 	MinBytes       int32
 	MaxBytes       int32
-	MaxWaitTimeMs  int32
+	// MaxWaitTimeMs should not exceed libkafka.RequestTimeout. See
+	// documentation for libkafka fetcher.PartitionFetcher.
+	MaxWaitTimeMs int32
 	//
 	fetchers map[int]FetcherSeekerCloser
 	next     chan int
