@@ -1,6 +1,7 @@
 package consumer
 
 import (
+	"crypto/tls"
 	"sync"
 	"time"
 
@@ -25,6 +26,7 @@ type ResponseHandlerFunc func(FetcherSeekerCloser, *Exchange)
 type Static struct {
 	// Kafka bootstrap either host:port or SRV
 	Bootstrap      string
+	TLS            *tls.Config
 	Topic          string
 	NumWorkers     int
 	HandleResponse ResponseHandlerFunc
@@ -84,6 +86,7 @@ func (c *Static) Start(partitionOffsets map[int32]int64) (<-chan *Exchange, erro
 		f := &fetcher.PartitionFetcher{
 			PartitionClient: client.PartitionClient{
 				Bootstrap: c.Bootstrap,
+				TLS:       c.TLS,
 				Topic:     c.Topic,
 				Partition: partition,
 			},

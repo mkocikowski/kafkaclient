@@ -20,7 +20,7 @@ const bootstrap = "localhost:9092"
 func createTopic(t *testing.T, numPartitions int32) string {
 	t.Helper()
 	topic := fmt.Sprintf("test-%x", rand.Uint32())
-	if _, err := client.CallCreateTopic(bootstrap, topic, numPartitions, 1); err != nil {
+	if _, err := client.CallCreateTopic(bootstrap, nil, topic, numPartitions, 1); err != nil {
 		t.Fatal(err)
 	}
 	return topic

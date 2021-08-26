@@ -39,7 +39,7 @@ func TestIntegrationOffsets(t *testing.T) {
 		t.Fatal(e)
 	}
 	//
-	if _, err := client.CallCreateTopic("localhost:9092", topic, 1, 1); err != nil {
+	if _, err := client.CallCreateTopic("localhost:9092", nil, topic, 1, 1); err != nil {
 		t.Fatal(err)
 	}
 	// topic exists but no offsets commited

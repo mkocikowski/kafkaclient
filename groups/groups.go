@@ -1,6 +1,7 @@
 package groups
 
 import (
+	"crypto/tls"
 	"log"
 	"sync"
 	"time"
@@ -20,6 +21,7 @@ type Assigner interface {
 
 type GroupMembershipManager struct {
 	Bootstrap string
+	TLS       *tls.Config
 	Assigner  Assigner
 	GroupId   string
 	//
@@ -34,6 +36,7 @@ type GroupMembershipManager struct {
 func (c *GroupMembershipManager) init() {
 	c.client = &client.GroupClient{
 		Bootstrap: c.Bootstrap,
+		TLS:       c.TLS,
 		GroupId:   c.GroupId,
 	}
 }
