@@ -2,6 +2,7 @@
 package producer
 
 import (
+	"crypto/tls"
 	"encoding/json"
 	"fmt"
 	"sync"
@@ -80,6 +81,7 @@ type Exchange struct {
 type Async struct {
 	// Kafka bootstrap either host:port or SRV
 	Bootstrap string
+	TLS       *tls.Config
 	Topic     string
 	// Produce to these partitions.
 	Partitions []int
@@ -244,6 +246,7 @@ func (p *Async) Start(input <-chan *Batch) (<-chan *Batch, error) {
 		p.producers[int(partition)] = &producer.PartitionProducer{
 			PartitionClient: client.PartitionClient{
 				Bootstrap:   p.Bootstrap,
+				TLS:         p.TLS,
 				Topic:       p.Topic,
 				Partition:   int32(partition),
 				ConnMaxIdle: p.ConnMaxIdle,

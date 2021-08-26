@@ -1,6 +1,7 @@
 package assigners
 
 import (
+	"crypto/tls"
 	"encoding/json"
 
 	"github.com/mkocikowski/libkafka/api/JoinGroup"
@@ -10,6 +11,7 @@ import (
 
 type RandomPartition struct {
 	Bootstrap string
+	TLS       *tls.Config
 	Topic     string
 }
 
@@ -27,8 +29,8 @@ func assignRandomPartitions(members []JoinGroup.Member, partitions []int32) map[
 	return assignments
 }
 
-func getPartitions(bootstrap, topic string) ([]int32, error) {
-	meta, err := client.CallMetadata(bootstrap, []string{topic})
+func getPartitions(bootstrap string, tlsConfig *tls.Config, topic string) ([]int32, error) {
+	meta, err := client.CallMetadata(bootstrap, tlsConfig, []string{topic})
 	if err != nil {
 		return nil, err
 	}
@@ -43,7 +45,7 @@ func (p *RandomPartition) Assign(members []JoinGroup.Member) ([]SyncGroup.Assign
 	if len(members) == 0 { // not leader
 		return []SyncGroup.Assignment{}, nil
 	}
-	partitions, err := getPartitions(p.Bootstrap, p.Topic)
+	partitions, err := getPartitions(p.Bootstrap, p.TLS, p.Topic)
 	if err != nil {
 		return nil, err
 	}

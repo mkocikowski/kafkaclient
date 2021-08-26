@@ -1,6 +1,7 @@
 package offsets
 
 import (
+	"crypto/tls"
 	"sync"
 	"time"
 
@@ -10,6 +11,7 @@ import (
 
 type DumbOffsetsManager struct {
 	Bootstrap string
+	TLS       *tls.Config
 	GroupId   string
 	Retention time.Duration
 	client    *client.GroupClient
@@ -24,6 +26,7 @@ func (c *DumbOffsetsManager) init() {
 	}
 	c.client = &client.GroupClient{
 		Bootstrap: c.Bootstrap,
+		TLS:       c.TLS,
 		GroupId:   c.GroupId,
 	}
 }
