@@ -54,8 +54,8 @@ func (c *DumbOffsetsManager) Fetch(topic string, partition int32) (int64, error)
 	return offset, err
 }
 
-// Commit makes a single CommitOffset api call. See Fetch documentation for
-// info on error handling.
+// Commit makes a single CommitOffset api call for a single partition. See Fetch
+// documentation for info on error handling.
 func (c *DumbOffsetsManager) Commit(topic string, partition int32, offset int64) error {
 	c.init() // idempotent
 	err := c.client.CommitOffset(topic, partition, offset, -1)
@@ -63,6 +63,19 @@ func (c *DumbOffsetsManager) Commit(topic string, partition int32, offset int64)
 		c.client.Close() // will reconnect on next call
 		err = errors.Format("error for topic %s partition %d: %w",
 			topic, partition, err)
+	}
+	return err
+}
+
+// CommitAll makes a single CommitOffsets api call for a set of partitions. See
+// Fetch documentation for info on error handling.
+func (c *DumbOffsetsManager) CommitAll(topic string, offsets map[int32]int64) error {
+	c.init()
+	err := c.client.CommitMultiplePartitionsOffsets(topic, offsets, -1)
+	if err != nil {
+		c.client.Close()
+		err = errors.Format("error for topic %s and offsets map %v: %w",
+			topic, offsets, err)
 	}
 	return err
 }

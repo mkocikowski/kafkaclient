@@ -21,6 +21,7 @@ func TestIntegrationOffsets(t *testing.T) {
 		GroupId:   fmt.Sprintf("test-%x", rand.Uint32()),
 	}
 	topic := fmt.Sprintf("test-%x", rand.Uint32())
+	multiPartitionedTopic := fmt.Sprintf("test-multi-%x", rand.Uint32())
 	// topic does not exist
 	offset, err := m.Fetch(topic, 0)
 	if err != nil {
@@ -38,7 +39,8 @@ func TestIntegrationOffsets(t *testing.T) {
 	if e.Code != libkafka.ERR_UNKNOWN_TOPIC_OR_PARTITION {
 		t.Fatal(e)
 	}
-	//
+
+	// single partition at once
 	if _, err := client.CallCreateTopic("localhost:9092", nil, topic, 1, 1); err != nil {
 		t.Fatal(err)
 	}
@@ -59,6 +61,49 @@ func TestIntegrationOffsets(t *testing.T) {
 		t.Fatal(err)
 	}
 	if offset != 100 {
+		t.Fatal(offset)
+	}
+
+	// multiple partitions at once
+	if _, err := client.CallCreateTopic("localhost:9092", nil, multiPartitionedTopic, 2, 1); err != nil {
+		t.Fatal(err)
+	}
+	// check the initial values
+	offset, err = m.Fetch(multiPartitionedTopic, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if offset != -1 {
+		t.Fatal(offset)
+	}
+	offset, err = m.Fetch(multiPartitionedTopic, 1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if offset != -1 {
+		t.Fatal(offset)
+	}
+	offsets := map[int32]int64{
+		0: 100,
+		1: 101,
+	}
+	// commit new offsets
+	if err := m.CommitAll(multiPartitionedTopic, offsets); err != nil {
+		t.Fatal(err)
+	}
+	// ensure partitions got new offsets
+	offset, err = m.Fetch(multiPartitionedTopic, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if offset != 100 {
+		t.Fatal(offset)
+	}
+	offset, err = m.Fetch(multiPartitionedTopic, 1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if offset != 101 {
 		t.Fatal(offset)
 	}
 }

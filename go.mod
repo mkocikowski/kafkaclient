@@ -1,7 +1,5 @@
 module github.com/mkocikowski/kafkaclient
 
-go 1.13
+go 1.17
 
-require github.com/mkocikowski/libkafka v0.0.29
-
-//replace github.com/mkocikowski/libkafka => /home/mik/src/github.com/mkocikowski/libkafka
+require github.com/mkocikowski/libkafka v0.0.30
