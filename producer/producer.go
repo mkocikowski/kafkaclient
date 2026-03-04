@@ -118,6 +118,13 @@ type Async struct {
 	// documentation there. Should be less than connections.max.idle.ms
 	// specified in broker config.
 	ConnMaxIdle time.Duration
+	// ClientId is sent to the broker on every Kafka API request. Brokers
+	// use this value to enforce per-client KIP-13 quotas. Each distinct
+	// ClientId has its own quota bucket, so setting different ClientIds on
+	// different producers prevents one producer from consuming another's
+	// quota allowance. If empty, the broker treats the producer as an
+	// anonymous client sharing the default quota.
+	ClientId string
 	// Acks required. 0 no acks, 1 leader only, -1 all ISRs (as specified
 	// by min.insync.replicas).
 	Acks int
@@ -247,6 +254,7 @@ func (p *Async) Start(input <-chan *Batch) (<-chan *Batch, error) {
 			PartitionClient: client.PartitionClient{
 				Bootstrap:   p.Bootstrap,
 				TLS:         p.TLS,
+				ClientId:    p.ClientId,
 				Topic:       p.Topic,
 				Partition:   int32(partition),
 				ConnMaxIdle: p.ConnMaxIdle,
